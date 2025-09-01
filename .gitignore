@@ -1,0 +1,6 @@
+# Ignore all PNG and CSV files in the repository
+*.png
+*.csv
+*.jpg
+*.jpeg
+*.xlsx
