@@ -8,7 +8,7 @@ import cv2
 
 # Set the correct paths based on your folder structure
 LABELS_CSV = os.path.join(os.path.dirname(__file__), 'data', 'ODIR-5K', 'full_df.csv')
-IMAGES_DIR = os.path.join(os.path.dirname(__file__), 'data', 'ODIR-5K', 'ODIR-5K', 'ODIR-5K', 'Training Images')
+IMAGES_DIR = os.path.join(os.path.dirname(__file__), 'data', 'ODIR-5K', 'ODIR-5K', 'Training Images')
 
 # Load labels
 labels = pd.read_csv(LABELS_CSV)
