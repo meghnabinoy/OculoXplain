@@ -3,3 +3,5 @@ torchvision
 pandas
 opencv-python
 matplotlib
+scikit-learn==1.7.1
+openpyxl==3.1.5
