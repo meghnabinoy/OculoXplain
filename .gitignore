@@ -25,7 +25,7 @@ Thumbs.db
 Data/
 data/
 
-# Generated outputs and visualizations
+# Generated outputs and visualizations  
 *.png
 *.jpg
 *.jpeg
