@@ -1,6 +1,50 @@
-# Ignore all PNG and CSV files in the repository
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+.Python
+.venv/
+venv/
+ENV/
+env/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Large files - Model weights and datasets
+*.pth
+*.pkl
+*.h5
+Data/
+data/
+
+# Generated outputs and visualizations
 *.png
-*.csv
 *.jpg
 *.jpeg
+*.pdf
+
+# But keep important result visualizations
+!training_curves.png
+!gradcam_explanations.png
+!gradcam_explanation_*.png
+
+# Data files
+*.csv
 *.xlsx
+
+# Logs and temporary files
+logs/
+*.log
+tmp/
+temp/
+
+# Jupyter Notebooks
+.ipynb_checkpoints/
