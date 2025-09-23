@@ -24,6 +24,9 @@ Thumbs.db
 Data/
 data/
 
+# Allow important split data file
+!Data/Ocular_Disease_Dataset/full_df_with_split.csv
+
 # Old model files to ignore
 resnet50_baseline_odir5k.pth
 
