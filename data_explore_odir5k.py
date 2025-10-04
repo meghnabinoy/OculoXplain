@@ -7,8 +7,8 @@ import cv2
 
 
 # Set the correct paths based on your folder structure
-LABELS_CSV = r'C:\FinalProject\OculoXplain-main\Data\Ocular_Disease_Dataset\full_df.csv'
-IMAGES_DIR = r'C:\FinalProject\OculoXplain-main\Data\Ocular_Disease_Dataset\preprocessed_images'
+LABELS_CSV = r'd:\OCULOXPLAIN\OculoXplain\data\ODIR-5K\full_df.csv'
+IMAGES_DIR = r'd:\OCULOXPLAIN\OculoXplain\data\ODIR-5K\ODIR-5K\Training Images'
 
 # Load labels
 labels = pd.read_csv(LABELS_CSV)

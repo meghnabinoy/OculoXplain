@@ -34,10 +34,10 @@ class RetinalDiseaseExplainer:
         if model_path is None:
             model_path = "resnet50_retinal_disease_model.pth"
         if data_dir is None:
-            data_dir = r"C:\FinalProject\OculoXplain-main\Data\Ocular_Disease_Dataset\ODIR-5K\ODIR-5K\processed"
+            data_dir = r"D:\OCULOXPLAIN\OculoXplain\data\ODIR-5K\ODIR-5K\processed"
         
         self.model_path = model_path
-        self.data_dir = data_dir
+        self.data_dir = data_dir  # This line was missing the assignment
         
         # Load model
         self.model = self._load_model()
@@ -47,7 +47,7 @@ class RetinalDiseaseExplainer:
             transforms.Resize((224, 224)),
             transforms.ToTensor(),
             transforms.Normalize(mean=[0.485, 0.456, 0.406],
-                               std=[0.229, 0.224, 0.225])
+                            std=[0.229, 0.224, 0.225])
         ])
         
         # Transform for visualization (without normalization)

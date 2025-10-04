@@ -18,9 +18,9 @@ from albumentations import (
 )
 
 # Paths
-CSV_PATH = os.path.join('data', 'ODIR-5K', 'full_df_with_split.csv')
-IMG_DIR = os.path.join('data', 'ODIR-5K', 'ODIR-5K', 'ODIR-5K', 'Training Images')
-AUG_DIR = os.path.join('data', 'ODIR-5K', 'augmented')
+CSV_PATH = r'D:\OCULOXPLAIN\OculoXplain\data\ODIR-5K\full_df_with_split.csv'
+IMG_DIR = r'D:\OCULOXPLAIN\OculoXplain\data\ODIR-5K\ODIR-5K\Training Images'
+AUG_DIR = r'D:\OCULOXPLAIN\OculoXplain\data\ODIR-5K\augmented'
 os.makedirs(AUG_DIR, exist_ok=True)
 
 # Load data
@@ -81,7 +81,7 @@ for cls in rare_classes:
 # Save updated CSV
 if augmented_rows:
     aug_df = pd.DataFrame(augmented_rows)
-    out_csv = os.path.join('data', 'ODIR-5K', 'full_df_with_split_augmented.csv')
+    out_csv = r'D:\OCULOXPLAIN\OculoXplain\data\ODIR-5K\full_df_with_split_augmented.csv'
     pd.concat([labels, aug_df], ignore_index=True).to_csv(out_csv, index=False)
     print(f"Augmented data saved to {out_csv}")
 else:

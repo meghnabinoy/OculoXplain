@@ -2,7 +2,7 @@ import pandas as pd
 from sklearn.model_selection import train_test_split
 
 # Load the ODIR-5K full dataframe
-labels_df = pd.read_csv('Data/Ocular_Disease_Dataset/full_df.csv')
+labels_df = pd.read_csv(r'D:\OCULOXPLAIN\OculoXplain\data\ODIR-5K\full_df.csv')
 
 # --- 1. Explore class distribution ---
 # Disease columns: N,D,G,C,A,H,M,O (from the CSV header)
@@ -28,6 +28,6 @@ def assign_split(pid):
 labels_df['split'] = labels_df['ID'].apply(assign_split)
 
 # Save the new dataframe with split info
-labels_df.to_csv('Data/Ocular_Disease_Dataset/full_df_with_split.csv', index=False)
+labels_df.to_csv(r'D:\OCULOXPLAIN\OculoXplain\data\ODIR-5K\full_df_with_split.csv', index=False)
 print('\nSplit counts:')
 print(labels_df['split'].value_counts())

@@ -6,7 +6,7 @@ from PIL import Image, ImageOps
 import numpy as np
 
 # --- CONFIG ---
-BASE_DIR = r"C:\FinalProject\OculoXplain-main\Data\Ocular_Disease_Dataset\ODIR-5K\ODIR-5K"
+BASE_DIR = r"D:\OCULOXPLAIN\OculoXplain\data\ODIR-5K\ODIR-5K"
 DATA_FILE = os.path.join(BASE_DIR, "data.xlsx")
 TRAIN_IMG_DIR = os.path.join(BASE_DIR, "Training Images")
 PROCESSED_DIR = os.path.join(BASE_DIR, "processed")

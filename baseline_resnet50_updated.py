@@ -9,7 +9,7 @@ import matplotlib.pyplot as plt
 # =======================
 # PATH CONFIGURATION
 # =======================
-DATA_DIR = r"C:\FinalProject\OculoXplain-main\Data\Ocular_Disease_Dataset\ODIR-5K\ODIR-5K\processed"
+DATA_DIR = r"D:\OCULOXPLAIN\OculoXplain\data\ODIR-5K\ODIR-5K\processed"
 TRAIN_DIR = os.path.join(DATA_DIR, "train")
 VAL_DIR = os.path.join(DATA_DIR, "val")
 
