@@ -23,6 +23,9 @@ import io
 from datetime import datetime
 import json
 
+# Import rare disease page
+from rare_disease_page import page_rare_disease_analysis
+
 # ==================== PAGE CONFIGURATION ====================
 st.set_page_config(
     page_title="OculoXplain - Retinal Disease AI",
@@ -96,7 +99,7 @@ st.markdown("""
 
 # ==================== CACHE DECORATORS ====================
 @st.cache_resource
-def load_binary_model(model_path="resnet50_retinal_disease_model.pth"):
+def load_binary_model(model_path="../resnet50_retinal_disease_model.pth"):
     """Load the binary classification model (Healthy vs Disease)"""
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     
@@ -118,7 +121,7 @@ def load_binary_model(model_path="resnet50_retinal_disease_model.pth"):
         return None, device
 
 @st.cache_resource
-def load_multiclass_model(model_path="quick_model.pth"):
+def load_multiclass_model(model_path="../resnet50_multiclass_retinal_model.pth"):
     """Load the multi-class classification model"""
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     
@@ -266,30 +269,26 @@ def page_home():
     # Quick start section
     st.markdown('<h3 class="sub-header">🚀 Quick Start</h3>', unsafe_allow_html=True)
     
-    col1, col2, col3 = st.columns(3)
+    col1, col2 = st.columns(2)
     
     with col1:
-        st.markdown('<h3 class="sub-header"> Quick Start</h3>', unsafe_allow_html=True)
+        st.markdown('<div class="metric-card">', unsafe_allow_html=True)
+        st.markdown("### 🔍 Binary Classification")
+        st.markdown("Detect Healthy vs Disease")
+        if st.button("Start Analysis", key="quick_binary", use_container_width=True):
+            st.session_state.page = "binary"
+            st.rerun()
+        st.markdown('</div>', unsafe_allow_html=True)
 
-        col1, col2 = st.columns(2)
-
-        with col1:
-            st.markdown('<div class="metric-card">', unsafe_allow_html=True)
-            st.markdown("###  Binary Classification")
-            st.markdown("Detect Healthy vs Disease")
-            if st.button("Start Analysis", key="quick_binary", use_container_width=True):
-                st.session_state.page = "binary"
-                st.rerun()
-            st.markdown('</div>', unsafe_allow_html=True)
-
-        with col2:
-            st.markdown('<div class="metric-card">', unsafe_allow_html=True)
-            st.markdown("###  Multi-Class Analysis")
-            st.markdown("Identify 8 disease types")
-            if st.button("Start Analysis", key="quick_multi", use_container_width=True):
-                st.session_state.page = "multiclass"
-                st.rerun()
-            st.markdown('</div>', unsafe_allow_html=True)
+    with col2:
+        st.markdown('<div class="metric-card">', unsafe_allow_html=True)
+        st.markdown("### 🔬 Disease Detection")
+        st.markdown("Analyze 51 retinal diseases")
+        if st.button("Start Analysis", key="quick_disease", use_container_width=True):
+            st.session_state.page = "disease"
+            st.rerun()
+        st.markdown('</div>', unsafe_allow_html=True)
+    
     st.markdown("""
     <p style="text-align: center; color: #999; font-size: 0.9rem;">
     OculoXplain v1.0 | Explainable AI for Retinal Disease Detection<br>
@@ -331,7 +330,7 @@ def page_binary_classification():
             show_gradcam = st.checkbox("📊 Generate Grad-CAM Explanation", value=True)
             show_confidence = st.checkbox("📈 Show Confidence Breakdown", value=True)
             
-            if st.button("🚀 Analyze Image", key="analyze_binary", use_container_width=True):
+            if st.button("🚀 Analyze Image", key="btn_analyze_binary", use_container_width=True):
                 st.session_state.analyze_binary = True
     
     with col2:
@@ -473,270 +472,6 @@ def page_binary_classification():
                        '<li>Click "Analyze Image" button</li>'
                        '<li>View results and explanations</li>'
                        '<li>Download report if needed</li>'
-                       '</ol>'
-                       '</div>', unsafe_allow_html=True)
-
-def page_multiclass_classification():
-    """Multi-class classification page"""
-    st.markdown('<h1 class="main-header">🏥 Multi-Class Disease Analysis</h1>', unsafe_allow_html=True)
-    st.markdown("Identify specific retinal diseases with detailed analysis")
-    
-    st.markdown("---")
-    
-    # Load model
-    model, device = load_multiclass_model()
-    
-    if model is None:
-        st.error("❌ Failed to load multi-class model")
-        return
-    
-    disease_info = {
-        'N': {'name': 'Normal', 'desc': 'Healthy retina', 'color': '#28a745'},
-        'D': {'name': 'Diabetic Retinopathy', 'desc': 'Diabetes-related vessel damage', 'color': '#dc3545'},
-        'G': {'name': 'Glaucoma', 'desc': 'Optic nerve damage', 'color': '#ffc107'},
-        'C': {'name': 'Cataract', 'desc': 'Lens opacity', 'color': '#17a2b8'},
-        'A': {'name': 'AMD', 'desc': 'Age-related macular degeneration', 'color': '#e83e8c'},
-        'H': {'name': 'Hypertensive Retinopathy', 'desc': 'High blood pressure effects', 'color': '#6c757d'},
-        'M': {'name': 'Myopia', 'desc': 'Nearsightedness complications', 'color': '#007bff'},
-        'O': {'name': 'Other Diseases', 'desc': 'Various other conditions', 'color': '#fd7e14'}
-    }
-    
-    col1, col2 = st.columns([1, 1], gap="large")
-    
-    with col1:
-        st.markdown('<h3 class="sub-header">📤 Upload Image</h3>', unsafe_allow_html=True)
-        
-        uploaded_file = st.file_uploader("Choose a fundus image", type=['jpg', 'jpeg', 'png'], key="multi_upload")
-        
-        if uploaded_file is not None:
-            image = Image.open(uploaded_file)
-            st.image(image, caption="Uploaded Fundus Image", use_container_width=True)
-            
-            temp_path = f"temp_multi_{uploaded_file.name}"
-            image.save(temp_path)
-            
-            st.markdown('<h3 class="sub-header">🔧 Analysis Options</h3>', unsafe_allow_html=True)
-            
-            show_gradcam = st.checkbox("📊 Show Grad-CAM for Top Predictions", value=True, key="multi_cam")
-            show_all_classes = st.checkbox("📈 Show All Disease Classes", value=True, key="multi_all")
-            
-            if st.button("🚀 Analyze Diseases", key="analyze_multi", use_container_width=True):
-                st.session_state.analyze_multi = True
-    
-    with col2:
-        st.markdown('<h3 class="sub-header">📊 Analysis Results</h3>', unsafe_allow_html=True)
-        
-        if uploaded_file is not None and st.session_state.get("analyze_multi", False):
-            with st.spinner("🔄 Analyzing image for all disease types..."):
-                try:
-                    # Preprocess
-                    img_array, img_norm = preprocess_image(Image.open(temp_path))
-                    if img_array is None:
-                        st.error("Failed to preprocess image")
-                        return
-                    
-                    img_tensor = get_image_tensor(Image.fromarray(img_array), device)
-                    
-                    # Predict
-                    predictions, conf = predict_multiclass(model, device, img_tensor)
-                    
-                    if predictions is None:
-                        st.error("Prediction failed")
-                        return
-
-                    # Set up label map and rare/unknown detection
-                    label_map = {0: 'A', 1: 'C', 2: 'D', 3: 'G', 4: 'H', 5: 'M', 6: 'N', 7: 'O'}
-                    top_conf = float(predictions[0]['confidence']) if predictions else 0.0
-                    second_conf = float(predictions[1]['confidence']) if len(predictions) > 1 else 0.0
-                    margin = top_conf - second_conf
-                    probs = np.clip(np.array(conf, dtype=np.float32), 1e-9, 1.0)
-                    entropy = float(-(probs * np.log(probs)).sum())
-                    rare_flag = (top_conf < 0.45) or (margin < 0.15) or (entropy > 1.2)
-                    
-                    if rare_flag:
-                        st.markdown(
-                            """
-                            <div class="warning-box" style="border: 1px solid #f0ad4e; padding: 14px; border-radius: 10px; background: #fff3cd; color: #6b3b00; box-shadow: 0 2px 6px rgba(0,0,0,0.08);">
-                            <h4 style="margin: 0 0 6px 0;">⚠️ Potential Rare/Unknown Presentation</h4>
-                            <p style="margin: 0 0 6px 0; font-weight: 600;">Confidence is low or predictions are ambiguous. Treat as <strong>rare/unknown</strong> and seek specialist review.</p>
-                            <ul style="margin: 0 0 0 1rem; padding: 0;">
-                                <li>Top confidence: {top:.1%}</li>
-                                <li>Margin (top1 - top2): {gap:.1%}</li>
-                                <li>Entropy: {entropy_val:.2f}</li>
-                            </ul>
-                            </div>
-                            """.format(top=top_conf, gap=margin, entropy_val=entropy),
-                            unsafe_allow_html=True
-                        )
-                    
-                    # Top predictions
-                    st.markdown("#### 🎯 Top 3 Predictions")
-                    
-                    for i, pred in enumerate(predictions, 1):
-                        code = pred['code']
-                        info = disease_info.get(code, {})
-                        
-                        col_num, col_pred = st.columns([0.8, 3], gap="small")
-                        
-                        with col_num:
-                            st.markdown(f"<h3 style='color: {info.get('color', '#999')}; text-align: center; margin-top: 0.5rem;'>#{i}</h3>", 
-                                       unsafe_allow_html=True)
-                        
-                        with col_pred:
-                            st.progress(float(pred['confidence']))
-                            st.markdown(f"**{info.get('name', code)}** ({code})")
-                            st.caption(info.get('desc', ''))
-                            st.markdown(f"**Confidence:** {pred['confidence']:.1%}")
-                    
-                    # All classes
-                    if show_all_classes:
-                        st.markdown("#### 📊 All Disease Classes")
-                        
-                        fig, ax = plt.subplots(figsize=(12, 6))
-                        codes = [label_map[i] for i in range(8)]
-                        names = [disease_info[c]['name'] for c in codes]
-                        colors_list = [disease_info[c]['color'] for c in codes]
-                        values = [conf[i] for i in range(8)]
-                        
-                        bars = ax.barh(names, values, color=colors_list, alpha=0.7, edgecolor='black', linewidth=1.5)
-                        ax.set_xlabel("Confidence Score", fontsize=12, fontweight='bold')
-                        ax.set_xlim([0, 1])
-                        
-                        for bar, val in zip(bars, values):
-                            width = bar.get_width()
-                            ax.text(width + 0.02, bar.get_y() + bar.get_height()/2.,
-                                   f'{val:.1%}', ha='left', va='center', fontsize=10, fontweight='bold')
-                        
-                        ax.grid(axis='x', alpha=0.3)
-                        st.pyplot(fig)
-                    
-                    # Grad-CAM
-                    if show_gradcam and len(predictions) >= 2:
-                        st.markdown("#### 🔬 Grad-CAM Explanations")
-                        with st.spinner("Generating Grad-CAM visualizations..."):
-                            fig, axes = plt.subplots(2, 3, figsize=(18, 10))
-                            fig.suptitle("Multi-Class Grad-CAM Analysis", fontsize=14, fontweight='bold')
-                            
-                            # Original
-                            axes[0, 0].imshow(img_array)
-                            axes[0, 0].set_title("Original Fundus Image", fontsize=12, fontweight='bold')
-                            axes[0, 0].axis('off')
-                            
-                            # Top 2 Grad-CAMs
-                            for i, pred in enumerate(predictions[:2]):
-                                col = i + 1
-                                cam = generate_gradcam(model, img_tensor, device, pred['index'])
-                                
-                                if cam is not None:
-                                    cam_viz = show_cam_on_image(img_norm, cam, use_rgb=True)
-                                    axes[0, col].imshow(cam_viz)
-                                    
-                                    code = pred['code']
-                                    name = disease_info.get(code, {}).get('name', code)
-                                    axes[0, col].set_title(f"{name}\n{pred['confidence']:.1%}", 
-                                                         fontsize=11, fontweight='bold')
-                                    axes[0, col].axis('off')
-                            
-                            # Summary
-                            axes[1, 0].axis('off')
-                            summary_text = "🔍 SUMMARY\n\n"
-                            for i, pred in enumerate(predictions, 1):
-                                code = pred['code']
-                                name = disease_info[code]['name']
-                                summary_text += f"{i}. {name} ({code})\n    {pred['confidence']:.1%}\n\n"
-                            
-                            axes[1, 0].text(0.05, 0.95, summary_text, transform=axes[1, 0].transAxes,
-                                          fontsize=10, verticalalignment='top', fontfamily='monospace',
-                                          bbox=dict(boxstyle='round', facecolor='lightblue', alpha=0.8))
-                            
-                            # Confidence chart
-                            axes[1, 1].axis('off')
-                            chart_text = "📈 CONFIDENCE\n\n"
-                            for pred in predictions:
-                                bar = "█" * int(pred['confidence'] * 20) + "░" * (20 - int(pred['confidence'] * 20))
-                                chart_text += f"{pred['code']}: {bar} {pred['confidence']:.1%}\n"
-                            
-                            axes[1, 1].text(0.05, 0.95, chart_text, transform=axes[1, 1].transAxes,
-                                          fontsize=9, verticalalignment='top', fontfamily='monospace',
-                                          bbox=dict(boxstyle='round', facecolor='lightyellow', alpha=0.8))
-                            
-                            # Interpretation
-                            axes[1, 2].axis('off')
-                            interp_text = "🎯 HEATMAP GUIDE\n\n"
-                            interp_text += "🔴 RED (Warm):\n"
-                            interp_text += "• Supporting prediction\n"
-                            interp_text += "• Key features\n\n"
-                            interp_text += "🔵 BLUE (Cool):\n"
-                            interp_text += "• Opposing prediction\n"
-                            interp_text += "• Less relevant\n\n"
-                            interp_text += "📍 Focus Areas:\n"
-                            interp_text += "• Optic disc\n"
-                            interp_text += "• Macula\n"
-                            interp_text += "• Vessels"
-                            
-                            axes[1, 2].text(0.05, 0.95, interp_text, transform=axes[1, 2].transAxes,
-                                          fontsize=9, verticalalignment='top',
-                                          bbox=dict(boxstyle='round', facecolor='lightgreen', alpha=0.8))
-                            
-                            plt.tight_layout()
-                            st.pyplot(fig)
-                    
-                    # Download
-                    st.markdown("---")
-                    col_d1, col_d2 = st.columns(2)
-                    
-                    with col_d1:
-                        report_data = {
-                            'timestamp': datetime.now().isoformat(),
-                            'image': uploaded_file.name,
-                            'rare_unknown_flag': bool(rare_flag),
-                            'rare_metrics': {
-                                'top_confidence': top_conf,
-                                'margin_top2': margin,
-                                'entropy': entropy
-                            },
-                            'top_3_predictions': [
-                                {'rank': i+1, 'disease': p['name'], 'code': p['code'], 'confidence': float(p['confidence'])}
-                                for i, p in enumerate(predictions)
-                            ],
-                            'all_confidences': {
-                                disease_info[label_map[i]]['name']: float(conf[i])
-                                for i in range(8)
-                            }
-                        }
-                        report_json = json.dumps(report_data, indent=2)
-                        st.download_button(
-                            label="📥 Download Report (JSON)",
-                            data=report_json,
-                            file_name=f"multiclass_report_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json",
-                            mime="application/json"
-                        )
-                    
-                    with col_d2:
-                        # Placeholder download button; buffer stays empty until image saving is added
-                        st.download_button(
-                            label="🖼️ Download Analysis Image",
-                            data=(img_buffer := io.BytesIO()),
-                            file_name=f"multiclass_result_{datetime.now().strftime('%Y%m%d_%H%M%S')}.png",
-                            mime="image/png",
-                            disabled=True
-                        )
-                    
-                except Exception as e:
-                    st.error(f"❌ Error during analysis: {e}")
-            
-            if os.path.exists(temp_path):
-                os.remove(temp_path)
-        else:
-            st.markdown('<div class="info-box">'
-                       '<h4>📋 Instructions</h4>'
-                       '<ol>'
-                       '<li>Upload a fundus image (JPG or PNG)</li>'
-                       '<li>Choose display options</li>'
-                       '<li>Click "Analyze Diseases"</li>'
-                       '<li>Review top 3 predictions</li>'
-                       '<li>View Grad-CAM explanations</li>'
-                       '<li>Download detailed report</li>'
                        '</ol>'
                        '</div>', unsafe_allow_html=True)
 
@@ -906,23 +641,23 @@ def main():
     if 'analyze_binary' not in st.session_state:
         st.session_state.analyze_binary = False
     
-    if 'analyze_multi' not in st.session_state:
-        st.session_state.analyze_multi = False
+    if 'analyze_disease' not in st.session_state:
+        st.session_state.analyze_disease = False
     
     # Sidebar
     with st.sidebar:
         st.markdown("# 🧭 Navigation")
         
-        page_options = ["Home", "Binary Classification", "Multi-Class Analysis", "About"]
+        page_options = ["Home", "Binary Classification", "Disease Detection", "About"]
         page_map = {
             "Home": "home",
             "Binary Classification": "binary",
-            "Multi-Class Analysis": "multiclass",
+            "Disease Detection": "disease",
             "About": "about"
         }
         
         selected_page = st.radio("Select Analysis Type", page_options, 
-                                index=["home", "binary", "multiclass", "about"].index(st.session_state.page))
+                                index=["home", "binary", "disease", "about"].index(st.session_state.page))
         
         st.session_state.page = page_map[selected_page]
         
@@ -938,11 +673,11 @@ def main():
             st.session_state.page = "binary"
             st.rerun()
         
-        if st.button("🏥 Multi-Class Analysis", use_container_width=True):
-            st.session_state.page = "multiclass"
+        if st.button("🔬 Disease Detection", use_container_width=True):
+            st.session_state.page = "disease"
             st.rerun()
         
-        if st.button("📚 Documentation", use_container_width=True):
+        if st.button("�📚 Documentation", use_container_width=True):
             st.session_state.page = "about"
             st.rerun()
     
@@ -951,8 +686,8 @@ def main():
         page_home()
     elif st.session_state.page == "binary":
         page_binary_classification()
-    elif st.session_state.page == "multiclass":
-        page_multiclass_classification()
+    elif st.session_state.page == "disease":
+        page_rare_disease_analysis()
     elif st.session_state.page == "about":
         page_about()
 
