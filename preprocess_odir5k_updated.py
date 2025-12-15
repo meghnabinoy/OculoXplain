@@ -4,6 +4,9 @@ import pandas as pd
 from sklearn.model_selection import train_test_split
 from PIL import Image, ImageOps
 import numpy as np
+import argparse
+from typing import Optional
+
 
 # --- CONFIG ---
 BASE_DIR = r"D:\OCULOXPLAIN\OculoXplain\data\ODIR-5K\ODIR-5K"
@@ -16,6 +19,47 @@ TARGET_SIZE = (224, 224)
 def get_label(row):
     """0 = healthy (N=1), 1 = disease (N=0)."""
     return 0 if row["N"] == 1 else 1
+
+def find_image_file(images_dir: str, img_filename: Optional[str]) -> Optional[str]:
+    """Try to resolve an image filename to an existing file in images_dir.
+    Accepts exact filenames or basename without extension; tries common extensions.
+    Returns full path or None if not found.
+    """
+    if img_filename is None or (isinstance(img_filename, float) and np.isnan(img_filename)):
+        return None
+    name = str(img_filename).strip()
+    if not name:
+        return None
+
+    # If it's already an absolute or relative path, check directly
+    candidate = os.path.join(images_dir, name)
+    if os.path.isfile(candidate):
+        return candidate
+
+    # Try as-is in images_dir
+    if os.path.isfile(os.path.join(images_dir, os.path.basename(name))):
+        return os.path.join(images_dir, os.path.basename(name))
+
+    # Try common image extensions
+    base, ext = os.path.splitext(name)
+    extensions = [ext] if ext else []
+    extensions += [".jpg", ".jpeg", ".png", ".tif", ".tiff", ".bmp"]
+    for e in extensions:
+        candidate = os.path.join(images_dir, base + e)
+        if os.path.isfile(candidate):
+            return candidate
+
+    # Fallback: search for files that start with the base name (handles suffixes)
+    try:
+        for f in os.listdir(images_dir):
+            if f.lower().startswith(base.lower()):
+                full = os.path.join(images_dir, f)
+                if os.path.isfile(full):
+                    return full
+    except Exception:
+        pass
+
+    return None
 
 def preprocess_image(src_path, dst_path):
     """Resize, remove borders, normalize, and save."""
@@ -56,6 +100,12 @@ def preprocess_image(src_path, dst_path):
     except Exception as e:
         print(f"Error processing {src_path}: {e}")
         return False
+    
+def count_files_in_dir(dir_path):
+    if not os.path.exists(dir_path):
+        return 0
+    return sum(1 for f in os.listdir(dir_path) if os.path.isfile(os.path.join(dir_path, f)))
+
 
 def main():
     print("Starting ODIR-5K preprocessing...")
