@@ -9,3 +9,4 @@ grad-cam>=1.4.0
 pytorch-grad-cam>=1.4.8
 Pillow>=9.0.0
 numpy>=1.21.0
+streamlit>=1.28.0
