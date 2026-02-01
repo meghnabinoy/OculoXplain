@@ -62,7 +62,7 @@ class RareDiseasesModel(nn.Module):
         return self.model(x)
 
 @st.cache_resource
-def load_rare_disease_model(model_path="../mobilenet_rfmid2_quick_model.pth"):
+def load_rare_disease_model(model_path="./mobilenet_rfmid2_quick_model.pth"):
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     try:
         model = RareDiseasesModel(num_classes=51)

@@ -50,7 +50,8 @@ st.markdown("""
         font-weight: bold;
     }
     .info-box {
-        background: linear-gradient(135deg, #e8f4f8 0%, #b3dfe8 100%);
+        background: linear-gradient(135deg, #1f6fa3 0%, #0b4f6c 100%);
+        color: #ffffff;
         border-left: 4px solid #1f77b4;
         padding: 1.5rem;
         margin: 1rem 0;
@@ -58,7 +59,7 @@ st.markdown("""
         box-shadow: 0 2px 4px rgba(0,0,0,0.1);
     }
     .success-box {
-        background: linear-gradient(135deg, #d4edda 0%, #98c68f 100%);
+        background: linear-gradient(135deg, #b7dfc1 0%, #6fa96b 100%);
         border-left: 4px solid #28a745;
         padding: 1.5rem;
         margin: 1rem 0;
@@ -66,7 +67,7 @@ st.markdown("""
         box-shadow: 0 2px 4px rgba(0,0,0,0.1);
     }
     .warning-box {
-        background: linear-gradient(135deg, #fff3cd 0%, #ffe8a1 100%);
+        background: linear-gradient(135deg, #e6b800 0%, #cc9900 100%);
         border-left: 4px solid #ffc107;
         padding: 1.5rem;
         margin: 1rem 0;
@@ -99,7 +100,7 @@ st.markdown("""
 
 # ==================== CACHE DECORATORS ====================
 @st.cache_resource
-def load_binary_model(model_path="../resnet50_retinal_disease_model.pth"):
+def load_binary_model(model_path="./resnet50_rfmid2_binary_model.pth"):
     """Load the binary classification model (Healthy vs Disease)"""
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     
