@@ -26,8 +26,8 @@ class ImprovedRetinalExplainer:
         
         # Paths
         self.model_path = model_path or 'quick_model.pth'
-        self.csv_path = csv_path or r'D:\OCULOXPLAIN\OculoXplain\data\ODIR-5K\full_df_with_split_augmented.csv'
-        self.img_dir = r'D:\OCULOXPLAIN\OculoXplain\data\ODIR-5K\ODIR-5K\Training Images'
+        self.csv_path = csv_path or r'D:\OculoXplain\OculoXplain\data\ODIR-5K\full_df_with_split_augmented.csv'
+        self.img_dir = r'D:\OculoXplain\OculoXplain\data\ODIR-5K\ODIR-5K\Training Images'
         
         # Load model and data
         self.model, self.label_map, self.idx_to_label = self._load_model()

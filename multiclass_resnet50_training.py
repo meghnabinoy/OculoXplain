@@ -19,9 +19,9 @@ from tqdm import tqdm
 import os
 
 # Configuration
-CSV_PATH = r'D:\OCULOXPLAIN\OculoXplain\data\ODIR-5K\full_df_with_split_augmented.csv'
-IMG_DIR = r'D:\OCULOXPLAIN\OculoXplain\data\ODIR-5K\ODIR-5K\Training Images'
-AUG_DIR = r'D:\OCULOXPLAIN\OculoXplain\data\ODIR-5K\augmented'
+CSV_PATH = r'D:\OculoXplain\OculoXplain\data\ODIR-5K\full_df_with_split_augmented.csv'
+IMG_DIR = r'D:\OculoXplain\OculoXplain\data\ODIR-5K\ODIR-5K\Training Images'
+AUG_DIR = r'D:\OculoXplain\OculoXplain\data\ODIR-5K\augmented'
 MODEL_SAVE_PATH = r'resnet50_multiclass_retinal_model.pth'
 
 # Device configuration
