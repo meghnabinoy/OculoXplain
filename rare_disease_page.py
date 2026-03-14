@@ -12,12 +12,14 @@ import cv2
 import numpy as np
 from PIL import Image
 import matplotlib.pyplot as plt
+from matplotlib.backends.backend_pdf import PdfPages
 from pytorch_grad_cam import GradCAM
 from pytorch_grad_cam.utils.model_targets import ClassifierOutputTarget
 from pytorch_grad_cam.utils.image import show_cam_on_image
 from datetime import datetime
-import json
 import html
+import io
+import textwrap
 
 # NLP explainer (BioBERT + scispaCy integration)
 _NLP_EXPLAIN_FN = None
@@ -66,6 +68,191 @@ def build_basic_nlp_fallback(top_pred):
         "used_external_text": False,
         "is_fallback": True,
     }
+
+
+def _wrap_report_text(value, width=105):
+    text = str(value or "").strip()
+    if not text:
+        return "N/A"
+    return "\n".join(textwrap.wrap(text, width=width))
+
+
+def create_rare_disease_pdf_report(
+    image_name,
+    predictions,
+    rare_disease_alert,
+    img_array,
+    img_normalized,
+    top_cam,
+    expl,
+    visual_evidence,
+):
+    """Build a multi-page PDF report with summary, Grad-CAM, and NLP sections."""
+    timestamp = datetime.now()
+    report_id = f"OX-RD-{timestamp.strftime('%Y%m%d-%H%M%S')}"
+
+    top_rows = []
+    for i, p in enumerate(predictions[:10], start=1):
+        top_rows.append([
+            str(i),
+            str(p.get("code", "N/A")),
+            str(p.get("name", "N/A")),
+            f"{float(p.get('probability', 0.0)) * 100.0:.2f}%",
+            "Yes" if p.get("is_rare") else "No",
+        ])
+
+    pdf_buffer = io.BytesIO()
+    with PdfPages(pdf_buffer) as pdf:
+        # Page 1: Summary and top predictions
+        fig1 = plt.figure(figsize=(8.27, 11.69))
+        fig1.patch.set_facecolor("white")
+        fig1.text(0.06, 0.965, "OculoXplain Rare Disease Analysis Report", fontsize=16, fontweight="bold", color="#0b4f6c")
+        fig1.text(0.06, 0.943, f"Generated: {timestamp.strftime('%Y-%m-%d %H:%M:%S')}", fontsize=10)
+        fig1.text(0.06, 0.927, f"Report ID: {report_id}", fontsize=10)
+
+        summary_data = [
+            ["Image name", str(image_name)],
+            ["Model", "ResNet50 rare disease detector (51 classes)"],
+            ["Rare disease alert", "Triggered" if rare_disease_alert else "Not triggered"],
+            ["Top prediction", str(predictions[0].get("name", "N/A")) if predictions else "N/A"],
+            ["Top prediction confidence", f"{float(predictions[0].get('probability', 0.0)) * 100.0:.2f}%" if predictions else "N/A"],
+        ]
+
+        ax_summary = fig1.add_axes([0.06, 0.73, 0.88, 0.17])
+        ax_summary.axis("off")
+        t_summary = ax_summary.table(cellText=summary_data, colLabels=["Field", "Value"], cellLoc="left", loc="upper left")
+        t_summary.auto_set_font_size(False)
+        t_summary.set_fontsize(9)
+        t_summary.scale(1, 1.3)
+
+        fig1.text(0.06, 0.695, "Top Predictions", fontsize=12, fontweight="bold")
+        ax_preds = fig1.add_axes([0.06, 0.37, 0.88, 0.30])
+        ax_preds.axis("off")
+        t_preds = ax_preds.table(
+            cellText=top_rows if top_rows else [["-", "-", "No predictions", "-", "-"]],
+            colLabels=["Rank", "Code", "Disease", "Probability", "Rare"],
+            cellLoc="left",
+            loc="upper left",
+        )
+        t_preds.auto_set_font_size(False)
+        t_preds.set_fontsize(9)
+        t_preds.scale(1, 1.28)
+
+        caution = (
+            "Important: This report is for research and clinical decision support only. "
+            "It is not a standalone diagnosis and must be interpreted by a qualified eye specialist."
+        )
+        fig1.text(0.06, 0.31, _wrap_report_text(caution, width=98), fontsize=9, color="#7c2d12")
+
+        pdf.savefig(fig1, bbox_inches="tight")
+        plt.close(fig1)
+
+        # Page 2: Grad-CAM evidence
+        fig2, axes = plt.subplots(2, 2, figsize=(8.27, 11.69))
+        fig2.patch.set_facecolor("white")
+        fig2.suptitle("Visual Evidence (Grad-CAM)", fontsize=14, fontweight="bold", y=0.985)
+
+        for ax in axes.flatten():
+            ax.axis("off")
+
+        axes[0, 0].imshow(img_array)
+        axes[0, 0].set_title("Original Image", fontsize=10, fontweight="bold")
+
+        if top_cam is not None:
+            cam_viz = show_cam_on_image(img_normalized, top_cam, use_rgb=True)
+            top_code = predictions[0].get("code", "Top-1") if predictions else "Top-1"
+            cam_viz = draw_localization_bbox(top_cam, cam_viz, color=(255, 255, 0), label=f"Focus: {top_code}")
+            axes[0, 1].imshow(cam_viz)
+            axes[0, 1].set_title("Grad-CAM Overlay (Top-1)", fontsize=10, fontweight="bold")
+
+            axes[1, 0].imshow(top_cam, cmap="jet")
+            axes[1, 0].set_title("Grad-CAM Heatmap (Top-1)", fontsize=10, fontweight="bold")
+        else:
+            axes[0, 1].text(0.03, 0.5, "Grad-CAM not available for this run.", fontsize=10)
+
+        visual_lines = []
+        if isinstance(visual_evidence, dict):
+            for key in ["predominant_zone", "activation_strength", "focus_spread", "quadrant"]:
+                if key in visual_evidence and visual_evidence.get(key) is not None:
+                    visual_lines.append(f"{key.replace('_', ' ').title()}: {visual_evidence.get(key)}")
+        if not visual_lines:
+            visual_lines = ["No additional visual evidence summary available."]
+
+        axes[1, 1].text(
+            0.01,
+            0.98,
+            _wrap_report_text("\n".join(visual_lines), width=46),
+            va="top",
+            fontsize=10,
+            bbox=dict(boxstyle="round", facecolor="#f3f7fb", alpha=0.9),
+        )
+        axes[1, 1].set_title("Visual Summary", fontsize=10, fontweight="bold")
+
+        plt.tight_layout(rect=[0, 0.02, 1, 0.965])
+        pdf.savefig(fig2, bbox_inches="tight")
+        plt.close(fig2)
+
+        # Page 3: NLP explanation and validation
+        fig3 = plt.figure(figsize=(8.27, 11.69))
+        fig3.patch.set_facecolor("white")
+        fig3.text(0.06, 0.965, "NLP Explanation", fontsize=14, fontweight="bold", color="#0b4f6c")
+
+        y = 0.935
+
+        def add_block(title, content):
+            nonlocal y
+            if y < 0.10:
+                return
+            fig3.text(0.06, y, title, fontsize=11, fontweight="bold")
+            y -= 0.018
+            wrapped = _wrap_report_text(content, width=106)
+            fig3.text(0.065, y, wrapped, fontsize=9, va="top")
+            y -= 0.012 * (wrapped.count("\n") + 2)
+
+        if expl:
+            add_block("Clinical Explanation", expl.get("clinical_explanation", "N/A"))
+            add_block("Patient-Friendly Explanation", expl.get("patient_explanation", "N/A"))
+            add_block("Heatmap Meaning", expl.get("heatmap_summary", "N/A"))
+
+            entities = expl.get("supporting_entities") or []
+            add_block("Key Concepts", ", ".join(entities) if entities else "N/A")
+
+            validation = expl.get("validation") or {}
+            if validation:
+                add_block(
+                    "Explanation Reliability",
+                    f"{validation.get('reliability_label', 'Unknown')} ({float(validation.get('reliability_score', 0.0)) * 100.0:.1f}%)",
+                )
+                add_block("Consistency Status", validation.get("consistency_status", "unknown"))
+                add_block("Consistency Message", validation.get("consistency_message", "N/A"))
+
+                expected = validation.get("expected_anatomy_zones") or []
+                add_block("Expected Anatomy Zones", ", ".join(expected) if expected else "N/A")
+                add_block("Detected Anatomy Zone", validation.get("detected_anatomy_zone", "N/A"))
+
+                factors = validation.get("factors") or {}
+                if factors:
+                    factor_text = "\n".join([f"- {k}: {v}" for k, v in factors.items()])
+                    add_block("Contributing Factors", factor_text)
+        else:
+            add_block("NLP Explanation", "No NLP explanation was generated for this analysis run.")
+
+        fig3.text(
+            0.06,
+            0.05,
+            _wrap_report_text(
+                "Disclaimer: This AI-generated report supports interpretation but does not replace comprehensive clinical evaluation.",
+                width=110,
+            ),
+            fontsize=9,
+            color="#7c2d12",
+        )
+
+        pdf.savefig(fig3, bbox_inches="tight")
+        plt.close(fig3)
+
+    pdf_buffer.seek(0)
+    return pdf_buffer.getvalue()
 
 # Disease mapping
 DISEASE_CLASSES = [
@@ -373,6 +560,51 @@ def generate_gradcam_rare(model, image_tensor, device, target_class):
     return cam[0, :]
 
 
+def draw_localization_bbox(grayscale_cam, visualization_img, threshold=0.5,
+                           color=(255, 255, 0), label="Focus Region"):
+    """
+    Draw a corner-bracket bounding box around the most activated GradCAM region.
+
+    Args:
+        grayscale_cam:     GradCAM heatmap (H x W, float32, 0-1)
+        visualization_img: uint8 RGB image to annotate (H x W x 3)
+        threshold:         Fraction of peak activation used to define the focus area
+        color:             RGB colour tuple for the box and label
+        label:             Text shown above the bounding box
+
+    Returns:
+        Annotated uint8 RGB image
+    """
+    cam_norm = grayscale_cam / (grayscale_cam.max() + 1e-8)
+    binary_mask = (cam_norm >= threshold).astype(np.uint8) * 255
+
+    contours, _ = cv2.findContours(binary_mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+    if not contours:
+        return visualization_img.copy()
+
+    x, y, w, h = cv2.boundingRect(max(contours, key=cv2.contourArea))
+    result = visualization_img.copy()
+
+    # Thin full rectangle as backdrop
+    cv2.rectangle(result, (x, y), (x + w, y + h), color, 1)
+
+    # Bold corner brackets (targeting-reticle style)
+    arm = max(6, min(w, h) // 5)
+    t = 2
+    for (px, py, dx, dy) in [
+        (x,     y,      1,  1),
+        (x + w, y,     -1,  1),
+        (x,     y + h,  1, -1),
+        (x + w, y + h, -1, -1),
+    ]:
+        cv2.line(result, (px, py), (px + dx * arm, py), color, t + 1)
+        cv2.line(result, (px, py), (px, py + dy * arm), color, t + 1)
+
+    cv2.putText(result, label, (x, max(y - 4, 12)),
+                cv2.FONT_HERSHEY_SIMPLEX, 0.38, color, 1, cv2.LINE_AA)
+    return result
+
+
 def build_disease_metadata(class_to_idx=None, idx_to_class=None):
     """Build class list and names, preferring mappings from checkpoint metadata."""
     if idx_to_class:
@@ -515,6 +747,11 @@ def page_rare_disease_analysis():
                                 cam = top_cam if i == 1 else generate_gradcam_rare(model, img_tensor, device, pred['index'])
                                 if cam is not None:
                                     cam_viz = show_cam_on_image(img_normalized, cam, use_rgb=True)
+                                    cam_viz = draw_localization_bbox(
+                                        cam, cam_viz,
+                                        color=(255, 255, 0),
+                                        label=f"Focus: {pred['code']}"
+                                    )
                                     axes[0, i].imshow(cam_viz)
                                     title = f"{pred['code']}: {pred['name'][:20]}"
                                     if pred['is_rare']:
@@ -670,28 +907,22 @@ def page_rare_disease_analysis():
                                 "heatmap focus is anatomically typical for the predicted disease. A mismatch does not prove the "
                                 "prediction is wrong, but it means you should interpret with more caution."
                             )
-                    report_data = {
-                        'timestamp': datetime.now().isoformat(),
-                        'image': uploaded_file.name,
-                        'model': 'ResNet50 rare disease detector',
-                        'rare_disease_alert': rare_count >= 3,
-                        'top_predictions': [
-                            {
-                                'rank': i+1,
-                                'code': p['code'],
-                                'name': p['name'],
-                                'probability': float(p['probability']),
-                                'is_rare': p['is_rare']
-                            }
-                            for i, p in enumerate(predictions)
-                        ]
-                    }
-                    
+                    report_pdf = create_rare_disease_pdf_report(
+                        image_name=uploaded_file.name,
+                        predictions=predictions,
+                        rare_disease_alert=(rare_count >= 3),
+                        img_array=img_array,
+                        img_normalized=img_normalized,
+                        top_cam=top_cam,
+                        expl=expl,
+                        visual_evidence=visual_evidence,
+                    )
+
                     st.download_button(
-                        label="📥 Download Full Report (JSON)",
-                        data=json.dumps(report_data, indent=2),
-                        file_name=f"rare_disease_report_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json",
-                        mime="application/json"
+                        label="📥 Download Full Report (PDF)",
+                        data=report_pdf,
+                        file_name=f"rare_disease_report_{datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf",
+                        mime="application/pdf"
                     )
                     
                 except Exception as e:
