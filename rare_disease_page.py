@@ -20,6 +20,9 @@ from datetime import datetime
 import html
 import io
 import textwrap
+import glob
+import json
+import os
 
 # NLP explainer (BioBERT + scispaCy integration)
 _NLP_EXPLAIN_FN = None
@@ -474,9 +477,15 @@ class RareDiseasesModel(nn.Module):
         return self.model(x)
 
 @st.cache_resource
-def load_rare_disease_model(model_path="./resnet50_merged_rfmid_model.pth"):
+def load_rare_disease_model(model_path=None):
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     try:
+        if model_path is None:
+            model_path = _resolve_best_resnet50_model_path()
+
+        if model_path is None or not os.path.exists(model_path):
+            raise FileNotFoundError("No ResNet50 rare-disease checkpoint was found.")
+
         checkpoint = torch.load(model_path, map_location=device)
 
         class_to_idx = None
@@ -512,10 +521,49 @@ def load_rare_disease_model(model_path="./resnet50_merged_rfmid_model.pth"):
         model.to(device)
         model.eval()
         st.success(f"✅ Rare disease ResNet50 model loaded ({num_classes} classes)")
+        st.caption(f"Using model checkpoint: {model_path}")
         return model, device, class_to_idx, idx_to_class
     except Exception as e:
         st.error(f"Error loading rare disease model: {e}")
         return None, device, None, None
+
+
+def _resolve_best_resnet50_model_path():
+    """Pick best available ResNet50 checkpoint from metrics files, fallback to latest model file."""
+    metrics_candidates = sorted(glob.glob("resnet50_merged_rfmid*_metrics.json"))
+    best_model_path = None
+    best_score = None
+
+    for metrics_path in metrics_candidates:
+        try:
+            with open(metrics_path, "r", encoding="utf-8") as f:
+                js = json.load(f)
+
+            macro_f1 = float(js.get("test_macro_f1", -1.0))
+            test_acc = float(js.get("test_accuracy", -1.0))
+            metric_mtime = os.path.getmtime(metrics_path)
+
+            explicit_model_path = js.get("artifacts", {}).get("model") if isinstance(js.get("artifacts"), dict) else None
+            if explicit_model_path and os.path.exists(explicit_model_path):
+                model_path = explicit_model_path
+            else:
+                model_path = metrics_path.replace("_metrics.json", "_model.pth")
+
+            if not os.path.exists(model_path):
+                continue
+
+            score = (macro_f1, test_acc, metric_mtime)
+            if best_score is None or score > best_score:
+                best_score = score
+                best_model_path = model_path
+        except Exception:
+            continue
+
+    if best_model_path:
+        return best_model_path
+
+    model_candidates = sorted(glob.glob("resnet50_merged_rfmid*_model.pth"), key=os.path.getmtime, reverse=True)
+    return model_candidates[0] if model_candidates else None
 
 def preprocess_image_rare(image_pil, device):
     transform = transforms.Compose([
@@ -532,7 +580,8 @@ def predict_rare_diseases(model, device, image_tensor, top_k=10):
     
     with torch.no_grad():
         outputs = model(image_tensor)
-        probs = torch.sigmoid(outputs)[0].cpu().numpy()
+        # Training uses CrossEntropyLoss (single-label multi-class), so Softmax is correct here.
+        probs = F.softmax(outputs, dim=1)[0].cpu().numpy()
     
     top_indices = np.argsort(probs)[::-1][:top_k]
     predictions = []

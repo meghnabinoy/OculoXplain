@@ -19,6 +19,7 @@ import json
 import random
 from collections import Counter
 from dataclasses import dataclass
+from datetime import datetime
 from pathlib import Path
 
 import matplotlib.pyplot as plt
@@ -27,7 +28,15 @@ import torch
 import torch.nn as nn
 import torch.optim as optim
 from PIL import Image
-from sklearn.metrics import classification_report, f1_score
+from sklearn.metrics import (
+    balanced_accuracy_score,
+    classification_report,
+    confusion_matrix,
+    f1_score,
+    precision_recall_fscore_support,
+    roc_auc_score,
+    top_k_accuracy_score,
+)
 from torch.utils.data import DataLoader, Dataset
 from torchvision import models, transforms
 
@@ -267,6 +276,70 @@ def plot_curves(history: dict[str, list[float]], save_path: Path) -> None:
     plt.close()
 
 
+def plot_confusion_matrix(
+    cm: np.ndarray,
+    class_names: list[str],
+    save_path: Path,
+    title: str,
+    normalize: bool,
+) -> None:
+    if normalize:
+        row_sums = cm.sum(axis=1, keepdims=True)
+        matrix = cm.astype(np.float32) / np.clip(row_sums, a_min=1, a_max=None)
+    else:
+        matrix = cm.astype(np.float32)
+
+    fig_size = max(10, min(24, int(0.35 * len(class_names)) + 6))
+    fig, ax = plt.subplots(figsize=(fig_size, fig_size))
+    im = ax.imshow(matrix, cmap="Blues")
+
+    ax.set_title(title)
+    ax.set_xlabel("Predicted")
+    ax.set_ylabel("True")
+    ax.set_xticks(np.arange(len(class_names)))
+    ax.set_yticks(np.arange(len(class_names)))
+    ax.set_xticklabels(class_names, rotation=90, fontsize=6)
+    ax.set_yticklabels(class_names, fontsize=6)
+    plt.colorbar(im, ax=ax, fraction=0.046, pad=0.04)
+
+    plt.tight_layout()
+    plt.savefig(save_path, dpi=200, bbox_inches="tight")
+    plt.close()
+
+
+def evaluate_model(model, loader, criterion, device):
+    model.eval()
+
+    total_loss = 0.0
+    preds_all: list[int] = []
+    labels_all: list[int] = []
+    probs_all: list[np.ndarray] = []
+
+    with torch.no_grad():
+        for images, labels in loader:
+            images = images.to(device, non_blocking=True)
+            labels = labels.to(device, non_blocking=True)
+
+            outputs = model(images)
+            loss = criterion(outputs, labels)
+            probs = torch.softmax(outputs, dim=1)
+            preds = torch.argmax(probs, dim=1)
+
+            total_loss += loss.item()
+            preds_all.extend(preds.detach().cpu().numpy().tolist())
+            labels_all.extend(labels.detach().cpu().numpy().tolist())
+            probs_all.append(probs.detach().cpu().numpy())
+
+    avg_loss = total_loss / max(1, len(loader))
+    y_true = np.array(labels_all, dtype=np.int64)
+    y_pred = np.array(preds_all, dtype=np.int64)
+    y_prob = np.concatenate(probs_all, axis=0) if probs_all else np.empty((0, 0), dtype=np.float32)
+
+    acc = float((y_pred == y_true).mean()) if len(y_true) else 0.0
+    macro_f1 = f1_score(y_true, y_pred, average="macro", zero_division=0) if len(y_true) else 0.0
+    return avg_loss, acc, macro_f1, y_true, y_pred, y_prob
+
+
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Train MobileNetV2 on merged RFMiD dataset")
     parser.add_argument("--epochs", type=int, default=NUM_EPOCHS, help="Number of training epochs")
@@ -287,14 +360,13 @@ def main() -> None:
     set_seed(RANDOM_SEED)
 
     run_name = args.run_name.strip().replace(" ", "_")
-    if run_name:
-        model_path = Path(f"{MODEL_STEM}_{run_name}_model.pth")
-        metrics_json = Path(f"{MODEL_STEM}_{run_name}_metrics.json")
-        curves_path = Path(f"{CURVES_STEM}_{run_name}.png")
-    else:
-        model_path = Path(f"{MODEL_STEM}_model.pth")
-        metrics_json = Path(f"{MODEL_STEM}_metrics.json")
-        curves_path = Path(f"{CURVES_STEM}.png")
+    if not run_name:
+        run_name = datetime.now().strftime("run_%Y%m%d_%H%M%S")
+
+    model_path = Path(f"{MODEL_STEM}_{run_name}_model.pth")
+    metrics_json = Path(f"{MODEL_STEM}_{run_name}_metrics.json")
+    curves_path = Path(f"{CURVES_STEM}_{run_name}.png")
+    confusion_path = Path(f"confusion_matrix_merged_rfmid_mobilenetv2_{run_name}.png")
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     batch_size = BATCH_SIZE_GPU if device.type == "cuda" else BATCH_SIZE_CPU
@@ -304,9 +376,11 @@ def main() -> None:
     print("=" * 90)
     print("MobileNetV2 training on merged RFMiD dataset")
     print(f"Device: {device}")
+    print(f"Run name: {run_name}")
     print(f"Output model: {model_path}")
     print(f"Output metrics: {metrics_json}")
     print(f"Output curves: {curves_path}")
+    print(f"Output confusion matrix: {confusion_path}")
     if device.type == "cuda":
         print(f"GPU: {torch.cuda.get_device_name(0)}")
     print("=" * 90)
@@ -435,18 +509,53 @@ def main() -> None:
     checkpoint = torch.load(model_path, map_location=device)
     model.load_state_dict(checkpoint["state_dict"])
 
-    test_loss, test_acc, test_f1, y_true, y_pred = run_epoch(
-        model, test_loader, criterion, optimizer, device, train_mode=False
+    test_loss, test_acc, test_f1, y_true, y_pred, y_prob = evaluate_model(
+        model, test_loader, criterion, device
     )
     class_names = [checkpoint["idx_to_class"][i] for i in range(len(checkpoint["idx_to_class"]))]
+    labels_idx = list(range(len(class_names)))
 
     report = classification_report(
         y_true,
         y_pred,
-        labels=list(range(len(class_names))),
+        labels=labels_idx,
         target_names=class_names,
         output_dict=True,
         zero_division=0,
+    )
+
+    cm = confusion_matrix(y_true, y_pred, labels=labels_idx)
+    cm_row_sums = cm.sum(axis=1, keepdims=True)
+    cm_norm = cm.astype(np.float32) / np.clip(cm_row_sums, a_min=1, a_max=None)
+
+    macro_precision, macro_recall, macro_f1, _ = precision_recall_fscore_support(
+        y_true, y_pred, average="macro", zero_division=0
+    )
+    weighted_precision, weighted_recall, weighted_f1, _ = precision_recall_fscore_support(
+        y_true, y_pred, average="weighted", zero_division=0
+    )
+    balanced_acc = balanced_accuracy_score(y_true, y_pred)
+
+    top3_acc = None
+    if y_prob.size and y_prob.shape[1] >= 2:
+        k = min(3, y_prob.shape[1])
+        top3_acc = float(top_k_accuracy_score(y_true, y_prob, k=k, labels=labels_idx))
+
+    roc_auc_ovr_macro = None
+    if y_prob.size and y_prob.shape[1] >= 2:
+        try:
+            roc_auc_ovr_macro = float(
+                roc_auc_score(y_true, y_prob, multi_class="ovr", average="macro", labels=labels_idx)
+            )
+        except ValueError:
+            roc_auc_ovr_macro = None
+
+    plot_confusion_matrix(
+        cm,
+        class_names,
+        confusion_path,
+        title="Confusion Matrix (Counts)",
+        normalize=False,
     )
 
     summary = {
@@ -455,11 +564,26 @@ def main() -> None:
         "test_loss": float(test_loss),
         "test_accuracy": float(test_acc),
         "test_macro_f1": float(test_f1),
+        "test_macro_precision": float(macro_precision),
+        "test_macro_recall": float(macro_recall),
+        "test_weighted_precision": float(weighted_precision),
+        "test_weighted_recall": float(weighted_recall),
+        "test_weighted_f1": float(weighted_f1),
+        "test_balanced_accuracy": float(balanced_acc),
+        "test_top3_accuracy": float(top3_acc) if top3_acc is not None else None,
+        "test_roc_auc_ovr_macro": roc_auc_ovr_macro,
         "num_classes": len(class_names),
         "num_train": len(train_samples),
         "num_val": len(val_samples),
         "num_test": len(test_samples),
+        "class_names": class_names,
+        "confusion_matrix": cm.tolist(),
+        "confusion_matrix_normalized": cm_norm.tolist(),
         "classification_report": report,
+        "artifacts": {
+            "curves": str(curves_path),
+            "confusion_matrix": str(confusion_path),
+        },
     }
 
     with metrics_json.open("w", encoding="utf-8") as f:
@@ -470,9 +594,13 @@ def main() -> None:
     print(f"Best epoch: {summary['best_epoch']} | best val macro F1: {summary['best_val_macro_f1']:.4f}")
     print(f"Test accuracy: {summary['test_accuracy']:.4f}")
     print(f"Test macro F1: {summary['test_macro_f1']:.4f}")
+    print(f"Test balanced accuracy: {summary['test_balanced_accuracy']:.4f}")
+    if summary["test_top3_accuracy"] is not None:
+        print(f"Test top-3 accuracy: {summary['test_top3_accuracy']:.4f}")
     print(f"Model: {model_path}")
     print(f"Metrics: {metrics_json}")
     print(f"Curves: {curves_path}")
+    print(f"Confusion matrix: {confusion_path}")
     print("=" * 90)
 
 

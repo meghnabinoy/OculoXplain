@@ -16,6 +16,7 @@ from PIL import Image
 import matplotlib.pyplot as plt
 import os
 import sys
+import glob
 from pytorch_grad_cam import GradCAM
 from pytorch_grad_cam.utils.model_targets import ClassifierOutputTarget
 from pytorch_grad_cam.utils.image import show_cam_on_image
@@ -413,6 +414,22 @@ def _safe_read_json(path):
     return None
 
 
+def _pick_latest_file(candidates):
+    """Return most recently modified file from candidate paths/patterns."""
+    existing = []
+    for c in candidates:
+        if any(ch in c for ch in ["*", "?", "["]):
+            existing.extend(glob.glob(c))
+        elif os.path.exists(c):
+            existing.append(c)
+
+    if not existing:
+        return None
+
+    existing = sorted(set(existing), key=lambda p: os.path.getmtime(p), reverse=True)
+    return existing[0]
+
+
 def _parse_training_acc_from_log(log_path):
     if not os.path.exists(log_path):
         return None
@@ -471,6 +488,14 @@ def get_current_validation_metrics():
             "label": "ResNet50 (Pretrained)",
             "metrics_file": "resnet50_merged_rfmid_metrics.json",
             "model_file": "resnet50_merged_rfmid_model.pth",
+            "metrics_candidates": [
+                "resnet50_merged_rfmid_metrics.json",
+                "resnet50_merged_rfmid_*_metrics.json",
+            ],
+            "model_candidates": [
+                "resnet50_merged_rfmid_model.pth",
+                "resnet50_merged_rfmid_*_model.pth",
+            ],
             "size_mb": 94.0,
             "fallback": {
                 "train_accuracy": 86.82,
@@ -486,6 +511,14 @@ def get_current_validation_metrics():
             "label": "MobileNetV2 (Pretrained)",
             "metrics_file": "mobilenetv2_merged_rfmid_pretrained_metrics.json",
             "model_file": "mobilenetv2_merged_rfmid_pretrained_model.pth",
+            "metrics_candidates": [
+                "mobilenetv2_merged_rfmid_pretrained_metrics.json",
+                "mobilenetv2_merged_rfmid_*_metrics.json",
+            ],
+            "model_candidates": [
+                "mobilenetv2_merged_rfmid_pretrained_model.pth",
+                "mobilenetv2_merged_rfmid_*_model.pth",
+            ],
             "size_mb": 14.0,
             "fallback": {
                 "train_accuracy": 86.79,
@@ -508,13 +541,16 @@ def get_current_validation_metrics():
     }
 
     for item in variants:
-        js = _safe_read_json(item["metrics_file"])
+        resolved_metrics_file = _pick_latest_file(item.get("metrics_candidates", [item["metrics_file"]])) or item["metrics_file"]
+        resolved_model_file = _pick_latest_file(item.get("model_candidates", [item["model_file"]])) or item["model_file"]
+
+        js = _safe_read_json(resolved_metrics_file)
         fallback = item["fallback"] or {}
 
         row = {
             "label": item["label"],
-            "metrics_file": item["metrics_file"],
-            "model_file": item["model_file"],
+            "metrics_file": resolved_metrics_file,
+            "model_file": resolved_model_file,
             "size_mb": item["size_mb"],
             "available": js is not None,
             "train_accuracy": fallback.get("train_accuracy"),
@@ -531,6 +567,11 @@ def get_current_validation_metrics():
             "weighted_precision": None,
             "weighted_recall": None,
             "weighted_f1": None,
+            "balanced_accuracy": None,
+            "top3_accuracy": None,
+            "roc_auc_ovr_macro": None,
+            "confusion_matrix": None,
+            "class_names": None,
         }
 
         if js:
@@ -541,6 +582,14 @@ def get_current_validation_metrics():
             row["test_loss"] = float(js.get("test_loss", row["test_loss"] or 0.0))
             row["classification_report"] = js.get("classification_report")
             row.update(_extract_report_metrics(js))
+            if js.get("test_balanced_accuracy") is not None:
+                row["balanced_accuracy"] = float(js.get("test_balanced_accuracy")) * 100.0
+            if js.get("test_top3_accuracy") is not None:
+                row["top3_accuracy"] = float(js.get("test_top3_accuracy")) * 100.0
+            if js.get("test_roc_auc_ovr_macro") is not None:
+                row["roc_auc_ovr_macro"] = float(js.get("test_roc_auc_ovr_macro"))
+            row["confusion_matrix"] = js.get("confusion_matrix")
+            row["class_names"] = js.get("class_names")
 
             dataset["classes"] = int(js.get("num_classes", dataset["classes"]))
             dataset["train"] = int(js.get("num_train", dataset["train"]))
@@ -751,36 +800,24 @@ def page_binary_classification():
                     
                     # Download report
                     st.markdown("---")
-                    col_d1, col_d2 = st.columns(2)
-                    
-                    with col_d1:
-                        report = create_download_report(prediction_class, prediction_conf, uploaded_file.name, "Binary")
-                        st.download_button(
-                            label="📥 Download Readable Report (HTML)",
-                            data=report,
-                            file_name=f"binary_report_{datetime.now().strftime('%Y%m%d_%H%M%S')}.html",
-                            mime="text/html"
-                        )
-                    
-                    with col_d2:
-                        # Create image with results
-                        fig, ax = plt.subplots(figsize=(10, 6))
-                        ax.imshow(img_array)
-                        ax.set_title(f"Prediction: {prediction_class} ({prediction_conf:.2%})", 
-                                   fontsize=16, fontweight='bold', pad=20)
-                        ax.axis('off')
-                        
-                        img_buffer = io.BytesIO()
-                        fig.savefig(img_buffer, format='png', bbox_inches='tight')
-                        img_buffer.seek(0)
-                        
-                        st.download_button(
-                            label="🖼️ Download Image with Results",
-                            data=img_buffer,
-                            file_name=f"binary_result_{datetime.now().strftime('%Y%m%d_%H%M%S')}.png",
-                            mime="image/png"
-                        )
-                        plt.close(fig)
+                    # Create image with results
+                    fig, ax = plt.subplots(figsize=(10, 6))
+                    ax.imshow(img_array)
+                    ax.set_title(f"Prediction: {prediction_class} ({prediction_conf:.2%})", 
+                               fontsize=16, fontweight='bold', pad=20)
+                    ax.axis('off')
+
+                    img_buffer = io.BytesIO()
+                    fig.savefig(img_buffer, format='png', bbox_inches='tight')
+                    img_buffer.seek(0)
+
+                    st.download_button(
+                        label="🖼️ Download Image with Results",
+                        data=img_buffer,
+                        file_name=f"binary_result_{datetime.now().strftime('%Y%m%d_%H%M%S')}.png",
+                        mime="image/png"
+                    )
+                    plt.close(fig)
                     
                 except Exception as e:
                     st.error(f"❌ Error during analysis: {e}")
@@ -990,6 +1027,9 @@ def page_system_validation():
                 "Train Accuracy (%)": round(v["train_accuracy"], 2) if v["train_accuracy"] is not None else np.nan,
                 "Test Accuracy (%)": round(v["test_accuracy"], 2) if v["test_accuracy"] is not None else np.nan,
                 "Test Macro F1": round((v["test_macro_f1"] or 0.0) / 100.0, 4) if v["test_macro_f1"] is not None else np.nan,
+                "Balanced Accuracy (%)": round(v["balanced_accuracy"], 2) if v["balanced_accuracy"] is not None else np.nan,
+                "Top-3 Accuracy (%)": round(v["top3_accuracy"], 2) if v["top3_accuracy"] is not None else np.nan,
+                "ROC-AUC OVR (macro)": round(v["roc_auc_ovr_macro"], 4) if v["roc_auc_ovr_macro"] is not None else np.nan,
                 "Best Val Macro F1": round((v["best_val_macro_f1"] or 0.0) / 100.0, 4) if v["best_val_macro_f1"] is not None else np.nan,
                 "Best Epoch": v["best_epoch"] if v["best_epoch"] is not None else "—",
                 "Test Loss": round(v["test_loss"], 4) if v["test_loss"] is not None else np.nan,
@@ -1140,6 +1180,12 @@ def page_system_validation():
             c3.metric("Weighted F1", f"{((selected_for_sys['weighted_f1'] or 0.0)/100.0):.4f}")
             c4.metric("Test Loss", f"{(selected_for_sys['test_loss'] or 0.0):.4f}")
 
+            c1, c2, c3 = st.columns(3)
+            c1.metric("Balanced Accuracy", f"{((selected_for_sys['balanced_accuracy'] or 0.0)/100.0):.2f}%")
+            c2.metric("Top-3 Accuracy", f"{((selected_for_sys['top3_accuracy'] or 0.0)/100.0):.2f}%")
+            auc_val = selected_for_sys["roc_auc_ovr_macro"]
+            c3.metric("ROC-AUC OVR (macro)", f"{auc_val:.4f}" if auc_val is not None else "N/A")
+
             st.markdown("### Validation Evidence Summary")
             p = (selected_for_sys["test_accuracy"] or 0.0) / 100.0
             n_test = max(1, dataset["test"])
@@ -1161,6 +1207,8 @@ def page_system_validation():
                 {"Evidence": "Generalization gap (train - test)", "Value": f"{generalization_gap:+.2f}%", "Interpretation": "Smaller positive gap indicates lower overfitting risk."},
                 {"Evidence": "Macro vs Weighted F1 gap", "Value": f"{fairness_gap:+.4f}", "Interpretation": "Near-zero gap indicates more balanced class performance."},
                 {"Evidence": "Validation-to-test consistency", "Value": f"Val macro F1={((selected_for_sys['best_val_macro_f1'] or 0.0)/100.0):.4f}, Test macro F1={((selected_for_sys['test_macro_f1'] or 0.0)/100.0):.4f}", "Interpretation": "Closer values suggest stable generalization from validation to test."},
+                {"Evidence": "Balanced accuracy", "Value": f"{((selected_for_sys['balanced_accuracy'] or 0.0)/100.0):.4f}", "Interpretation": "Average recall across classes; robust to class imbalance."},
+                {"Evidence": "Top-3 accuracy", "Value": f"{((selected_for_sys['top3_accuracy'] or 0.0)/100.0):.4f}", "Interpretation": "Model covers true class within top-3 ranked predictions."},
             ]
             st.dataframe(pd.DataFrame(ev_rows), use_container_width=True, hide_index=True)
 
@@ -1198,12 +1246,20 @@ def page_system_validation():
             labels = selected_for_sys.get("class_names") if isinstance(selected_for_sys, dict) else None
             if cm is not None:
                 cm_np = np.array(cm)
+                show_normalized_cm = st.checkbox("Show normalized confusion matrix", value=True, key="sysval_norm_cm")
+                if show_normalized_cm:
+                    row_sums = np.clip(cm_np.sum(axis=1, keepdims=True), a_min=1, a_max=None)
+                    cm_to_plot = cm_np.astype(np.float32) / row_sums
+                    cm_title = "Confusion Matrix (Normalized by True Class)"
+                else:
+                    cm_to_plot = cm_np
+                    cm_title = "Confusion Matrix (Counts)"
                 fig_cm, ax_cm = plt.subplots(figsize=(8, 6))
-                im = ax_cm.imshow(cm_np, cmap="Blues")
-                ax_cm.set_title("Confusion Matrix")
+                im = ax_cm.imshow(cm_to_plot, cmap="Blues")
+                ax_cm.set_title(cm_title)
                 ax_cm.set_xlabel("Predicted")
                 ax_cm.set_ylabel("True")
-                if labels and len(labels) == cm_np.shape[0]:
+                if labels and len(labels) == cm_to_plot.shape[0]:
                     ax_cm.set_xticks(range(len(labels)))
                     ax_cm.set_yticks(range(len(labels)))
                     ax_cm.set_xticklabels(labels, rotation=90, fontsize=6)
