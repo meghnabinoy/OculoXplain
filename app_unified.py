@@ -40,63 +40,180 @@ st.set_page_config(
 # ==================== STYLING ====================
 st.markdown("""
 <style>
+    :root {
+        --ox-primary: #0b4f6c;
+        --ox-secondary: #1f7a8c;
+        --ox-accent: #2f9fb5;
+        --ox-bg-soft: #f3f8fb;
+        --ox-surface: #ffffff;
+        --ox-border: #d9e7ef;
+        --ox-text: #16313f;
+    }
+    .stApp {
+        background:
+            radial-gradient(circle at 8% 0%, #e9f6fb 0%, transparent 42%),
+            radial-gradient(circle at 92% 8%, #eef8f3 0%, transparent 38%),
+            linear-gradient(180deg, #f6fbfd 0%, #f3f8fb 100%);
+        color: #102a3a;
+    }
+    [data-testid="stSidebar"] {
+        background: linear-gradient(180deg, #f4fbff 0%, #edf6fb 100%);
+        border-right: 1px solid var(--ox-border);
+    }
+    [data-testid="stSidebar"] * {
+        color: #16313f !important;
+    }
+    .stMarkdown,
+    .stText,
+    p,
+    li,
+    label,
+    .stCaption,
+    .stMetricLabel,
+    .stMetricValue {
+        color: #16313f !important;
+    }
     .main-header {
         font-size: 2.5rem;
-        color: #1f77b4;
+        color: var(--ox-primary);
         margin-bottom: 0.5rem;
-        font-weight: bold;
+        font-weight: 700;
+        letter-spacing: 0.2px;
     }
     .sub-header {
         font-size: 1.5rem;
-        color: #333;
+        color: var(--ox-text);
         margin-top: 1.5rem;
-        font-weight: bold;
+        font-weight: 700;
     }
     .info-box {
-        background: linear-gradient(135deg, #1f6fa3 0%, #0b4f6c 100%);
+        background: linear-gradient(135deg, #2a7fa8 0%, #0b4f6c 100%);
         color: #ffffff;
-        border-left: 4px solid #1f77b4;
+        border-left: 4px solid #4bb4cf;
         padding: 1.5rem;
         margin: 1rem 0;
-        border-radius: 8px;
-        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        border-radius: 12px;
+        box-shadow: 0 8px 20px rgba(8, 46, 67, 0.15);
     }
     .success-box {
-        background: linear-gradient(135deg, #b7dfc1 0%, #6fa96b 100%);
+        background: linear-gradient(135deg, #d7efe2 0%, #b2dbbf 100%);
         border-left: 4px solid #28a745;
         padding: 1.5rem;
         margin: 1rem 0;
-        border-radius: 8px;
-        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        border-radius: 12px;
+        box-shadow: 0 6px 16px rgba(34, 88, 53, 0.12);
     }
     .warning-box {
-        background: linear-gradient(135deg, #e6b800 0%, #cc9900 100%);
+        background: linear-gradient(135deg, #fff5cc 0%, #ffe08a 100%);
         border-left: 4px solid #ffc107;
         padding: 1.5rem;
         margin: 1rem 0;
-        border-radius: 8px;
-        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        border-radius: 12px;
+        box-shadow: 0 6px 14px rgba(113, 91, 26, 0.12);
     }
     .error-box {
-        background: linear-gradient(135deg, #f8d7da 0%, #f5a9b8 100%);
+        background: linear-gradient(135deg, #feecef 0%, #fcced9 100%);
         border-left: 4px solid #dc3545;
         padding: 1.5rem;
         margin: 1rem 0;
-        border-radius: 8px;
-        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        border-radius: 12px;
+        box-shadow: 0 6px 14px rgba(120, 44, 58, 0.12);
     }
     .metric-card {
-        background: white;
+        background: var(--ox-surface);
         padding: 1.5rem;
-        border-radius: 8px;
-        box-shadow: 0 2px 8px rgba(0,0,0,0.1);
-        border-top: 3px solid #1f77b4;
+        border-radius: 12px;
+        box-shadow: 0 8px 24px rgba(16, 57, 78, 0.08);
+        border: 1px solid var(--ox-border);
+        border-top: 4px solid var(--ox-secondary);
+        color: #16313f;
+    }
+    .home-card-title {
+        margin: 0;
+        color: #0b4f6c;
+        font-size: 1.25rem;
+        font-weight: 700;
+    }
+    .home-card-desc {
+        margin-top: 0.45rem;
+        margin-bottom: 0;
+        color: #26495c;
+        font-size: 0.98rem;
+        font-weight: 500;
+    }
+    button[role="tab"] {
+        color: #16313f !important;
+        background: #e8f3f8 !important;
+        border: 1px solid #c7dde8 !important;
+        border-radius: 10px !important;
+    }
+    button[role="tab"][aria-selected="true"] {
+        color: #ffffff !important;
+        background: #0b4f6c !important;
+        border: 1px solid #0b4f6c !important;
+    }
+    div[data-testid="stMetric"] {
+        background: #ffffff;
+        border: 1px solid #d8e7ef;
+        border-radius: 10px;
+        padding: 0.45rem 0.65rem;
+    }
+    div[data-testid="stMetric"] label,
+    div[data-testid="stMetric"] [data-testid="stMetricLabel"],
+    div[data-testid="stMetric"] [data-testid="stMetricValue"] {
+        color: #16313f !important;
+        font-weight: 600;
+    }
+    div[data-testid="stDataFrame"] {
+        background: #ffffff;
+        border: 1px solid #d8e7ef;
+        border-radius: 10px;
     }
     .button-group {
         display: flex;
         gap: 1rem;
         flex-wrap: wrap;
         margin: 1rem 0;
+    }
+    .stButton > button {
+        background: #0b4f6c !important;
+        color: #ffffff !important;
+        border: 1px solid #0b4f6c !important;
+        border-radius: 10px !important;
+        font-weight: 600 !important;
+    }
+    .stButton > button:hover {
+        background: #0e6285 !important;
+        border-color: #0e6285 !important;
+        color: #ffffff !important;
+    }
+    [data-testid="stFileUploader"] {
+        background: #ffffff;
+        border: 1px solid #c9dfea;
+        border-radius: 12px;
+        padding: 0.5rem;
+    }
+    [data-testid="stFileUploader"] section {
+        background: #f7fcff !important;
+        border: 1px dashed #7aa9bf !important;
+        border-radius: 10px !important;
+    }
+    [data-testid="stFileUploader"] small,
+    [data-testid="stFileUploader"] span,
+    [data-testid="stFileUploader"] p {
+        color: #1c3f52 !important;
+    }
+    [data-testid="stFileUploader"] button {
+        background: #0b4f6c !important;
+        color: #ffffff !important;
+        border: 1px solid #0b4f6c !important;
+        border-radius: 8px !important;
+        font-weight: 600 !important;
+    }
+    [data-testid="stFileUploader"] button:hover {
+        background: #0e6285 !important;
+        border-color: #0e6285 !important;
+        color: #ffffff !important;
     }
 </style>
 """, unsafe_allow_html=True)
@@ -625,41 +742,46 @@ def page_home():
     
     with col1:
         st.markdown('<h1 class="main-header">👁️ OculoXplain</h1>', unsafe_allow_html=True)
-        st.markdown('<p style="font-size: 1.2rem; color: #666; margin-top: -1rem;">Explainable AI for Retinal Disease Detection</p>', unsafe_allow_html=True)
+        st.markdown('<p style="font-size: 1.2rem; color: #20465c; margin-top: -1rem; font-weight: 500;">Explainable AI for Retinal Disease Detection</p>', unsafe_allow_html=True)
     
     with col2:
         st.markdown("")
         st.markdown("")
         if torch.cuda.is_available():
-            st.success(f"🚀 GPU Ready: {torch.cuda.get_device_name(0)}")
+            st.success(f"GPU Ready: {torch.cuda.get_device_name(0)}")
         else:
             st.info("💻 CPU Mode")
-    
-    # Quick start section
-    st.markdown('<h3 class="sub-header">🚀 Quick Start</h3>', unsafe_allow_html=True)
-    
+
+    st.markdown('<h3 class="sub-header">Start Analysis</h3>', unsafe_allow_html=True)
+
     col1, col2 = st.columns(2)
-    
+
     with col1:
-        st.markdown('<div class="metric-card">', unsafe_allow_html=True)
-        st.markdown("### 🔍 Binary Classification")
-        st.markdown("Detect Healthy vs Disease")
+        st.markdown(
+            '<div class="metric-card">'
+            '<h4 class="home-card-title">Binary Classification</h4>'
+            '<p class="home-card-desc">Detect Healthy vs Disease</p>'
+            '</div>',
+            unsafe_allow_html=True,
+        )
         if st.button("Start Analysis", key="quick_binary", use_container_width=True):
             st.session_state.page = "binary"
             st.rerun()
-        st.markdown('</div>', unsafe_allow_html=True)
 
     with col2:
-        st.markdown('<div class="metric-card">', unsafe_allow_html=True)
-        st.markdown("### 🔬 Disease Detection")
-        st.markdown("Analyze 51 retinal diseases")
+        st.markdown(
+            '<div class="metric-card">'
+            '<h4 class="home-card-title">Disease Detection</h4>'
+            '<p class="home-card-desc">Analyze 51 retinal diseases</p>'
+            '</div>',
+            unsafe_allow_html=True,
+        )
         if st.button("Start Analysis", key="quick_disease", use_container_width=True):
             st.session_state.page = "disease"
             st.rerun()
-        st.markdown('</div>', unsafe_allow_html=True)
     
     st.markdown("""
-    <p style="text-align: center; color: #999; font-size: 0.9rem;">
+    <p style="text-align: center; color: #35586b; font-size: 0.9rem; font-weight: 500;">
     OculoXplain v1.0 | Explainable AI for Retinal Disease Detection<br>
     ⚠️ For research purposes only | Not for clinical diagnosis
     </p>
@@ -699,7 +821,7 @@ def page_binary_classification():
             show_gradcam = st.checkbox("📊 Generate Grad-CAM Explanation", value=True)
             show_confidence = st.checkbox("📈 Show Confidence Breakdown", value=True)
             
-            if st.button("🚀 Analyze Image", key="btn_analyze_binary", use_container_width=True):
+            if st.button("Analyze Image", key="btn_analyze_binary", use_container_width=True):
                 st.session_state.analyze_binary = True
     
     with col2:
@@ -833,7 +955,7 @@ def page_binary_classification():
                        '<li>Select analysis options</li>'
                        '<li>Click "Analyze Image" button</li>'
                        '<li>View results and explanations</li>'
-                       '<li>Download report if needed</li>'
+                       '<li>Download image if needed</li>'
                        '</ol>'
                        '</div>', unsafe_allow_html=True)
 
@@ -845,151 +967,153 @@ def page_about():
     
     with tab1:
         st.markdown("""
-        ## 🔬 Explainable AI for Retinal Disease Detection
-        
-        OculoXplain is an intelligent system designed to assist healthcare professionals in detecting and 
-        understanding retinal diseases through AI-powered analysis of fundus images.
-        
-        ### Key Features
-        
-        - **Binary Classification**: Quickly detect if a retina shows disease presence
-        - **Multi-Class Analysis**: Identify specific disease types among 8 categories
-        - **Explainability**: Grad-CAM visualizations show which retinal regions influenced predictions
-        - **High Accuracy**: Built on ResNet50 with transfer learning from ImageNet
-        - **Fast Processing**: GPU-accelerated analysis in seconds
-        
-        ### Supported Diseases
-        
-        1. **N - Normal**: Healthy retina
-        2. **D - Diabetic Retinopathy**: Diabetes-related blood vessel damage
-        3. **G - Glaucoma**: Optic nerve damage
-        4. **C - Cataract**: Lens opacity
-        5. **A - AMD**: Age-related macular degeneration
-        6. **H - Hypertensive Retinopathy**: High blood pressure effects
-        7. **M - Myopia**: Nearsightedness-related complications
-        8. **O - Other**: Various other retinal conditions
+                ## Current System Overview
+
+                OculoXplain is an explainable retinal image analysis platform for research use.
+                The current application focuses on two practical tasks:
+
+                - **Binary Classification**: Healthy vs Disease screening
+                - **Disease Detection**: 51-class retinal disease prediction
+                - **Visual Explainability**: Grad-CAM heatmaps and focus localization
+                - **NLP Layer**: Clinical and patient-friendly explanation text
+                - **System Validation**: Side-by-side model comparison and evidence panels
+
+                ### What Is New In This Version
+
+                - Unified interface for binary, disease detection, and validation workflows
+                - Model artifact-driven evaluation (metrics files and checkpoints)
+                - Downloadable outputs:
+                    - Binary page: image with prediction overlay
+                    - Disease page: full PDF report
+                - Improved dashboard styling for clinical readability
+
+                ### Intended Use
+
+                - Academic research and model evaluation
+                - AI explainability demonstrations for retinal imaging
+                - Decision-support prototyping (not diagnostic deployment)
         """)
     
     with tab2:
         st.markdown("""
-        ## 🚀 How to Use OculoXplain
+        ## How to Use OculoXplain
         
         ### Binary Classification Workflow
-        
-        1. **Upload Image**: Click on the upload button and select your fundus image (JPG/PNG)
-        2. **Configure Options**: Choose whether to display Grad-CAM and confidence breakdowns
-        3. **Analyze**: Click the "Analyze Image" button
-        4. **Review Results**: 
-           - Primary prediction (Healthy or Disease)
-           - Confidence percentage
-           - Confidence breakdown chart
-           - Grad-CAM heatmap (optional)
-        5. **Download**: Save the report or annotated image
-        
-        ### Multi-Class Analysis Workflow
-        
-        1. **Upload Image**: Select your fundus image
-        2. **Select Options**: Enable all disease classes and Grad-CAM if desired
-        3. **Analyze**: Click "Analyze Diseases"
-        4. **Review Results**:
-           - Top 3 disease predictions
-           - All 8 disease class scores
-           - Individual Grad-CAM for top predictions
-           - Detailed confidence breakdown
-        5. **Download**: Export a readable report (HTML, printable as PDF)
+
+          1. Upload a fundus image (JPG/PNG)
+          2. Choose optional views (Grad-CAM, confidence breakdown)
+          3. Click **Analyze Image**
+          4. Review prediction, confidence, and visual explanation
+          5. Download the result image if needed
+
+          ### Disease Detection Workflow (51 Classes)
+
+          1. Upload a retinal image
+          2. Configure:
+              - Top-k predictions
+              - Grad-CAM visualization
+              - Full class distribution view
+          3. Click **Analyze for Rare Diseases**
+          4. Review:
+              - Ranked disease predictions
+              - Rare-disease alerting signal
+              - NLP explanation and validation panel
+          5. Download the generated PDF report
+
+          ### System Validation Workflow
+
+          1. Open **System Validation** from navigation
+          2. Compare available model variants in the summary table
+          3. Inspect validation plots, evidence summaries, and class-wise behavior
+          4. Use this page as a traceable record for model selection
         
         ### Image Requirements
-        
+
         - **Format**: JPG or PNG
         - **Size**: Recommended 400×400 pixels or larger
         - **Quality**: Clear fundus photograph
-        - **View**: Optic disc or macula should be visible
+          - **View**: Macula/optic disc region should be visible
+          - **Tip**: Avoid images with severe artifacts, blur, or large black borders
         """)
     
     with tab3:
-        st.markdown("""
-        ## 🔧 Technology Stack
-        
-        ### Model Architecture
-        - **Base Model**: ResNet50 (pretrained on ImageNet)
-        - **Transfer Learning**: Fine-tuned on ODIR-5K dataset
-        - **Framework**: PyTorch
-        - **Input Size**: 224×224 pixels
-        
-        ### Explainability Method
-        - **Technique**: Grad-CAM (Gradient-weighted Class Activation Mapping)
-        - **Purpose**: Localize important regions that influence predictions
-        - **Visualization**: Heatmap overlay on original image
-        - **Interpretation**: Warm colors = supporting prediction, Cool colors = opposing
-        
-        ### Dataset
-        - **Primary Dataset**: ODIR-5K (7,000 fundus images)
-        - **Classes**: 8 disease types + Normal
-        - **Train/Val Split**: 80/20
-        - **Augmentation**: Random rotation, flip, brightness adjustments
-        
-        ### Performance
-        - **Binary Model Accuracy**: ~85-90%
-        - **Multi-Class Accuracy**: ~75-80%
-        - **Processing Time**: <2 seconds per image (GPU)
-        - **GPU Support**: NVIDIA CUDA compatible
-        
-        ### Web Interface
-        - **Framework**: Streamlit
-        - **Deployment**: Can run locally or on cloud
-        - **Responsiveness**: Mobile-friendly design
-        """)
+        st.markdown(
+            """
+            <h2 style="color:#0b4f6c; margin-bottom:0.5rem;">Technology Stack</h2>
+
+            <h4 style="color:#16313f; margin-top:1rem; margin-bottom:0.3rem;">Core ML Stack</h4>
+            <ul style="color:#16313f; margin-top:0.2rem;">
+                <li>Framework: PyTorch + Torchvision</li>
+                <li>Architectures in project: ResNet50 and MobileNetV2</li>
+                <li>Input pipeline: 224x224 normalization with deterministic preprocessing for inference</li>
+                <li>Inference modes: Binary (Healthy vs Disease) and Multi-class (51 retinal disease labels)</li>
+            </ul>
+
+            <h4 style="color:#16313f; margin-top:1rem; margin-bottom:0.3rem;">Explainability Stack</h4>
+            <ul style="color:#16313f; margin-top:0.2rem;">
+                <li>Grad-CAM for visual localization of model attention</li>
+                <li>Bounding-box localization over salient activation regions</li>
+                <li>NLP explainer for clinical and patient-friendly interpretation text</li>
+                <li>Validation panel for explanation consistency and reliability cues</li>
+            </ul>
+
+            <h4 style="color:#16313f; margin-top:1rem; margin-bottom:0.3rem;">Validation and Reporting</h4>
+            <ul style="color:#16313f; margin-top:0.2rem;">
+                <li>Model comparison from stored run artifacts</li>
+                <li>Metrics in app: accuracy, macro and weighted metrics, ROC-AUC (when available), loss, and convergence indicators</li>
+                <li>Evidence views: convergence plots, class-wise F1 distribution, and confusion matrix when present</li>
+                <li>Exports: binary result image and disease-detection PDF report</li>
+            </ul>
+
+            <h4 style="color:#16313f; margin-top:1rem; margin-bottom:0.3rem;">Data Context</h4>
+            <ul style="color:#16313f; margin-top:0.2rem;">
+                <li>Current workflows are aligned to RFMiD-based retinal disease classification artifacts</li>
+                <li>Dataset split and class counts are read from run metrics when available</li>
+            </ul>
+            """,
+            unsafe_allow_html=True,
+        )
     
     with tab4:
         st.markdown("""
         ## ⚠️ Important Limitations
-        
+
         ### Clinical Limitations
-        
-        1. **Not FDA Approved**: OculoXplain is for research purposes only
-        2. **Not Diagnostic**: Cannot replace clinical diagnosis by qualified ophthalmologists
-        3. **Supplementary Tool**: Should be used to support, not replace, expert judgment
-        4. **Limited Scope**: Can only analyze fundus photographs, not comprehensive eye exams
-        5. **Population Specific**: Trained primarily on certain demographic groups
-        
+
+        1. **Research Use Only**: This system is not a certified medical device.
+        2. **Not a Diagnosis Tool**: Outputs must be reviewed by qualified ophthalmologists.
+        3. **Single-Image Limitation**: Predictions do not include full clinical history, OCT, or longitudinal context.
+        4. **Population and Site Shift**: Performance may vary across devices, regions, and cohorts.
+
         ### Technical Limitations
-        
-        1. **Image Quality Dependent**: Requires good-quality fundus images
-        2. **Black Borders**: May fail on images with extensive black margins
-        3. **Artifact Sensitivity**: Can be affected by media opacities, cataracts
-        4. **Limited Context**: Analyzes single images, not patient history
-        5. **Class Imbalance**: Some rare diseases may have lower accuracy
-        
+
+        1. **Image quality sensitivity**: Blur, low illumination, and artifacts can reduce reliability.
+        2. **Class imbalance risk**: Rare classes may show unstable behavior compared with common classes.
+        3. **Checkpoint dependency**: Results depend on available local model and metrics artifacts.
+        4. **Explainability constraints**: Heatmaps indicate correlation, not pathology causation.
+
         ### Grad-CAM Limitations
-        
-        1. **Correlation, Not Causation**: Heatmaps show correlation, not proof of disease
-        2. **Model-Specific**: Explanations are based on model internals, not clinical facts
-        3. **Post-Hoc Explanation**: Generated after prediction, may not reflect actual reasoning
-        4. **Adversarial Sensitivity**: Can be fooled by adversarial perturbations
-        
+
+        1. **Post-hoc explanation**: Generated after prediction from internal gradients.
+        2. **Architecture-specific behavior**: Different models may highlight different regions.
+        3. **Localization uncertainty**: Diffuse attention can reduce anatomical interpretability.
+
         ### Recommendations
-        
-        ✅ **DO**:
-        - Use as a screening tool for further investigation
-        - Combine with clinical expertise
-        - Document all results and analyses
-        - Keep image metadata and reports
-        
-        ❌ **DON'T**:
-        - Use for standalone clinical diagnosis
-        - Replace comprehensive eye exams
-        - Trust predictions on poor-quality images
-        - Rely solely on AI without expert review
+
+        - Use as an assistive screening and triage aid only
+        - Confirm findings with clinical examination and specialist review
+        - Track model behavior with the System Validation page before deployment decisions
+        - Avoid using predictions from poor-quality images without manual re-check
         """)
     
     # Footer
     st.markdown("---")
     st.markdown("""
-    <p style="text-align: center; color: #999; font-size: 0.9rem;">
+    <p style="text-align: center; color: #35586b; font-size: 0.9rem; font-weight: 500;">
     <strong>OculoXplain v1.0</strong><br>
-    Explainable AI for Retinal Disease Detection<br>
-    <em>Research Project - Not for Clinical Use</em><br>
-    © 2024 | All Rights Reserved
+    Explainable AI for Retinal Disease Detection and Validation<br>
+    <em>Research Use Only - Not for Clinical Diagnosis</em><br>
+    Updated 2026
     </p>
     """, unsafe_allow_html=True)
 
@@ -1015,7 +1139,7 @@ def page_system_validation():
     with tab1:
         st.markdown("## Comparison of Trained Model Variants")
         st.markdown(
-            f"All models were evaluated on the merged RFMiD dataset ({dataset['classes']} classes, "
+            f"All models were evaluated on the RFMiD dataset ({dataset['classes']} classes, "
             f"{dataset['train']} train / {dataset['val']} val / {dataset['test']} test)."
         )
 
@@ -1027,8 +1151,6 @@ def page_system_validation():
                 "Train Accuracy (%)": round(v["train_accuracy"], 2) if v["train_accuracy"] is not None else np.nan,
                 "Test Accuracy (%)": round(v["test_accuracy"], 2) if v["test_accuracy"] is not None else np.nan,
                 "Test Macro F1": round((v["test_macro_f1"] or 0.0) / 100.0, 4) if v["test_macro_f1"] is not None else np.nan,
-                "Balanced Accuracy (%)": round(v["balanced_accuracy"], 2) if v["balanced_accuracy"] is not None else np.nan,
-                "Top-3 Accuracy (%)": round(v["top3_accuracy"], 2) if v["top3_accuracy"] is not None else np.nan,
                 "ROC-AUC OVR (macro)": round(v["roc_auc_ovr_macro"], 4) if v["roc_auc_ovr_macro"] is not None else np.nan,
                 "Best Val Macro F1": round((v["best_val_macro_f1"] or 0.0) / 100.0, 4) if v["best_val_macro_f1"] is not None else np.nan,
                 "Best Epoch": v["best_epoch"] if v["best_epoch"] is not None else "—",
@@ -1180,11 +1302,10 @@ def page_system_validation():
             c3.metric("Weighted F1", f"{((selected_for_sys['weighted_f1'] or 0.0)/100.0):.4f}")
             c4.metric("Test Loss", f"{(selected_for_sys['test_loss'] or 0.0):.4f}")
 
-            c1, c2, c3 = st.columns(3)
-            c1.metric("Balanced Accuracy", f"{((selected_for_sys['balanced_accuracy'] or 0.0)/100.0):.2f}%")
-            c2.metric("Top-3 Accuracy", f"{((selected_for_sys['top3_accuracy'] or 0.0)/100.0):.2f}%")
+            c1, c2 = st.columns(2)
             auc_val = selected_for_sys["roc_auc_ovr_macro"]
-            c3.metric("ROC-AUC OVR (macro)", f"{auc_val:.4f}" if auc_val is not None else "N/A")
+            c1.metric("ROC-AUC OVR (macro)", f"{auc_val:.4f}" if auc_val is not None else "N/A")
+            c2.metric("Best Validation Macro F1", f"{((selected_for_sys['best_val_macro_f1'] or 0.0)/100.0):.4f}")
 
             st.markdown("### Validation Evidence Summary")
             p = (selected_for_sys["test_accuracy"] or 0.0) / 100.0
@@ -1207,8 +1328,6 @@ def page_system_validation():
                 {"Evidence": "Generalization gap (train - test)", "Value": f"{generalization_gap:+.2f}%", "Interpretation": "Smaller positive gap indicates lower overfitting risk."},
                 {"Evidence": "Macro vs Weighted F1 gap", "Value": f"{fairness_gap:+.4f}", "Interpretation": "Near-zero gap indicates more balanced class performance."},
                 {"Evidence": "Validation-to-test consistency", "Value": f"Val macro F1={((selected_for_sys['best_val_macro_f1'] or 0.0)/100.0):.4f}, Test macro F1={((selected_for_sys['test_macro_f1'] or 0.0)/100.0):.4f}", "Interpretation": "Closer values suggest stable generalization from validation to test."},
-                {"Evidence": "Balanced accuracy", "Value": f"{((selected_for_sys['balanced_accuracy'] or 0.0)/100.0):.4f}", "Interpretation": "Average recall across classes; robust to class imbalance."},
-                {"Evidence": "Top-3 accuracy", "Value": f"{((selected_for_sys['top3_accuracy'] or 0.0)/100.0):.4f}", "Interpretation": "Model covers true class within top-3 ranked predictions."},
             ]
             st.dataframe(pd.DataFrame(ev_rows), use_container_width=True, hide_index=True)
 
@@ -1331,29 +1450,8 @@ def main():
         
         st.session_state.page = page_map[selected_page]
         
-        # Quick links
         st.markdown("---")
-        st.markdown("### 🔗 Quick Links")
-        
-        if st.button("🏠 Go to Home", use_container_width=True):
-            st.session_state.page = "home"
-            st.rerun()
-        
-        if st.button("📊 Binary Analysis", use_container_width=True):
-            st.session_state.page = "binary"
-            st.rerun()
-        
-        if st.button("🔬 Disease Detection", use_container_width=True):
-            st.session_state.page = "disease"
-            st.rerun()
-
-        if st.button("✅ System Validation", use_container_width=True):
-            st.session_state.page = "system_validation"
-            st.rerun()
-        
-        if st.button("�📚 Documentation", use_container_width=True):
-            st.session_state.page = "about"
-            st.rerun()
+        st.caption("Use the selector above to navigate between pages.")
     
     # Route to selected page
     if st.session_state.page == "home":

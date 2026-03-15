@@ -113,6 +113,14 @@ def _cosine(a: np.ndarray, b: np.ndarray) -> float:
 # =========================
 # spaCy entity extraction
 # =========================
+
+# Generic non-clinical words to exclude from entity results
+_CLINICAL_SKIP = {
+    "patient", "patients", "history", "reports", "report",
+    "case", "cases", "age", "year", "years", "month", "months",
+    "day", "days", "complaint", "complaints", "note", "notes",
+}
+
 def _extract_entities(text: str, top_k: int) -> List[str]:
     if not text or not text.strip():
         return []
@@ -124,13 +132,40 @@ def _extract_entities(text: str, top_k: int) -> List[str]:
         return []
 
     entities = []
+
+    # 1. Try named entities first — works well with biomedical spaCy models
     for ent in doc.ents:
         if (
             len(ent.text) > 2
-            and ent.label_ not in {"CARDINAL", "ORDINAL", "QUANTITY"}
+            and ent.label_ not in {"CARDINAL", "ORDINAL", "QUANTITY", "DATE", "TIME"}
+            and ent.text.lower() not in _CLINICAL_SKIP
         ):
             entities.append(ent.text.lower())
 
+    # 2. If NER returned nothing (general English model has no medical NER),
+    #    walk every NOUN token and build a phrase that includes any immediately
+    #    preceding adjective or verb modifier (e.g. "blurred vision", "floaters").
+    #    This is robust regardless of how spaCy labels medical text.
+    if not entities:
+        seen: set = set()
+        for token in doc:
+            if token.pos_ != "NOUN":
+                continue
+            if token.text.lower() in _CLINICAL_SKIP:
+                continue
+            # Check the token directly to the left for an ADJ or VERB modifier
+            left_mod = ""
+            if token.i > 0:
+                prev = doc[token.i - 1]
+                if prev.pos_ in ("ADJ", "VERB") and prev.dep_ in (
+                    "amod", "compound", "ROOT", "advmod"
+                ):
+                    left_mod = prev.text
+            phrase = (f"{left_mod} {token.text}".strip() if left_mod else token.text)
+            phrase = phrase.lower()
+            if len(phrase) > 2 and phrase not in seen:
+                seen.add(phrase)
+                entities.append(phrase)
 
     return list(dict.fromkeys(entities))[:top_k]
 
@@ -194,6 +229,337 @@ def _fallback_semantic_profile() -> Dict[str, List[str]]:
         "concepts": ["retinal abnormality"],
         "descriptions": ["patterns in the retina that may indicate disease activity"],
     }
+
+
+# Disease-specific semantic profiles keyed by disease name (lowercase) and disease code.
+# Used when BioBERT is unavailable (offline mode without cached weights).
+_DISEASE_SEMANTIC_KB: Dict[str, Dict[str, List[str]]] = {
+    # --- Optic disc / nerve ---
+    "odc": {
+        "concepts": ["optic disc cupping", "increased cup-to-disc ratio"],
+        "descriptions": [
+            "increased excavation of the optic disc, suggesting possible raised intraocular pressure or glaucomatous nerve damage",
+            "elevated cup-to-disc ratio which may indicate progressive optic nerve head changes",
+        ],
+    },
+    "ode": {
+        "concepts": ["optic disc oedema", "disc swelling"],
+        "descriptions": [
+            "swelling of the optic disc that may arise from raised intracranial pressure, optic neuritis, or vascular causes",
+        ],
+    },
+    "odp": {
+        "concepts": ["optic disc pit", "structural disc anomaly"],
+        "descriptions": [
+            "a congenital pit-like depression in the optic disc that can be associated with serous macular detachment",
+        ],
+    },
+    "on": {
+        "concepts": ["optic neuritis", "optic nerve inflammation"],
+        "descriptions": [
+            "inflammation of the optic nerve, often associated with demyelinating conditions such as multiple sclerosis",
+        ],
+    },
+    "opdm": {
+        "concepts": ["optic disc pallor", "optic atrophy"],
+        "descriptions": [
+            "pallor of the optic disc indicating possible optic atrophy from prior ischaemia, compression, or neurodegenerative processes",
+        ],
+    },
+    "aion": {
+        "concepts": ["anterior ischaemic optic neuropathy", "optic nerve ischaemia"],
+        "descriptions": [
+            "sudden loss of blood supply to the optic nerve head, commonly presenting with acute painless visual field loss",
+        ],
+    },
+    "iih": {
+        "concepts": ["raised intracranial pressure", "papilloedema"],
+        "descriptions": [
+            "raised intracranial pressure causing bilateral optic disc oedema, associated with idiopathic intracranial hypertension",
+        ],
+    },
+    "td": {
+        "concepts": ["tilted disc syndrome", "optic disc tilting"],
+        "descriptions": [
+            "an oblique entry of the optic nerve causing disc tilting, commonly associated with myopia and bitemporal visual field defects",
+        ],
+    },
+    "tv": {
+        "concepts": ["temporal disc pallor", "optic nerve damage"],
+        "descriptions": [
+            "pallor confined to the temporal portion of the optic disc, which may indicate axonal loss affecting the papillomacular bundle",
+        ],
+    },
+    "ms": {
+        "concepts": ["myelinated nerve fibres", "retinal nerve fibre layer anomaly"],
+        "descriptions": [
+            "abnormal myelination of retinal nerve fibres appearing as white feathery patches adjacent to the optic disc",
+        ],
+    },
+    # --- Macula ---
+    "armd": {
+        "concepts": ["age-related macular degeneration", "macular degeneration"],
+        "descriptions": [
+            "degenerative changes in the macula, characterised by drusen deposits, geographic atrophy, or choroidal neovascularisation, causing central vision loss",
+        ],
+    },
+    "cnv": {
+        "concepts": ["choroidal neovascularisation", "subretinal neovascular membrane"],
+        "descriptions": [
+            "abnormal growth of new blood vessels from the choroid beneath the retina, frequently causing fluid leakage and central vision distortion",
+        ],
+    },
+    "csc": {
+        "concepts": ["central serous chorioretinopathy", "subretinal fluid accumulation"],
+        "descriptions": [
+            "accumulation of subretinal fluid beneath the neurosensory retina at the macula, often causing blurred or distorted central vision",
+        ],
+    },
+    "csr": {
+        "concepts": ["central serous retinopathy", "serous macular detachment"],
+        "descriptions": [
+            "serous detachment of the neurosensory retina, typically in the macular region, related to choroidal hyperpermeability",
+        ],
+    },
+    "crs": {
+        "concepts": ["chronic central serous", "persistent subretinal fluid"],
+        "descriptions": [
+            "chronic form of serous retinopathy with persistent fluid under the macula and secondary RPE changes",
+        ],
+    },
+    "cme": {
+        "concepts": ["cystoid macular oedema", "intraretinal fluid"],
+        "descriptions": [
+            "cystic accumulation of fluid within the macular retinal layers, causing decreased central visual acuity",
+        ],
+    },
+    "me": {
+        "concepts": ["macular oedema", "retinal fluid accumulation"],
+        "descriptions": [
+            "swelling of the macula due to fluid accumulation, often secondary to diabetic retinopathy or retinal vein occlusion",
+        ],
+    },
+    "mh": {
+        "concepts": ["macular hole", "full-thickness macular defect"],
+        "descriptions": [
+            "a full-thickness loss of retinal tissue at the fovea causing central scotoma, often associated with vitreous traction",
+        ],
+    },
+    "mhl": {
+        "concepts": ["large macular hole", "significant foveal defect"],
+        "descriptions": [
+            "a large full-thickness macular hole with significant central retinal tissue loss and corresponding central vision impairment",
+        ],
+    },
+    "mca": {
+        "concepts": ["macular atrophy", "geographic atrophy at macula"],
+        "descriptions": [
+            "focal loss of the retinal pigment epithelium and photoreceptors in the macular region, leading to irreversible central vision reduction",
+        ],
+    },
+    "erm": {
+        "concepts": ["epiretinal membrane", "macular pucker"],
+        "descriptions": [
+            "a fibrocellular membrane on the inner retinal surface at the macula causing distortion and reduced visual acuity",
+        ],
+    },
+    "edn": {
+        "concepts": ["epiretinal membrane with drusen", "combined macular pathology"],
+        "descriptions": [
+            "coexistence of an epiretinal membrane with underlying drusen deposits, combining tractional and degenerative mechanisms",
+        ],
+    },
+    "hped": {
+        "concepts": ["haemorrhagic pigment epithelial detachment", "choroidal bleed"],
+        "descriptions": [
+            "detachment of the pigment epithelium with haemorrhagic contents, often indicating choroidal neovascularisation beneath",
+        ],
+    },
+    "sofe": {
+        "concepts": ["subretinal fluid", "serous detachment"],
+        "descriptions": [
+            "fluid beneath the neurosensory retina indicating disruption of the outer blood-retinal barrier or active choroidal pathology",
+        ],
+    },
+    "rs": {
+        "concepts": ["retinal scar", "chorioretinal scar"],
+        "descriptions": [
+            "a chorioretinal scar resulting from prior inflammation, laser treatment, or trauma, with associated loss of photoreceptors",
+        ],
+    },
+    "rpec": {
+        "concepts": ["RPE changes", "retinal pigment epithelium disruption"],
+        "descriptions": [
+            "changes in the retinal pigment epithelium such as atrophy, hyperpigmentation or hypopigmentation, often secondary to chronic disease",
+        ],
+    },
+    # --- Vascular ---
+    "dr": {
+        "concepts": ["diabetic retinopathy", "microvascular retinal disease"],
+        "descriptions": [
+            "diabetic microvascular damage affecting retinal capillaries, presenting as microaneurysms, haemorrhages, exudates, and in advanced stages, neovascularisation",
+        ],
+    },
+    "htn": {
+        "concepts": ["hypertensive retinopathy", "hypertension-related retinal changes"],
+        "descriptions": [
+            "retinal vascular changes caused by chronic hypertension, including arteriolar narrowing, arteriovenous nipping, and flame haemorrhages",
+        ],
+    },
+    "brvo": {
+        "concepts": ["branch retinal vein occlusion", "sectoral retinal venous obstruction"],
+        "descriptions": [
+            "occlusion of a branch retinal vein causing sectoral haemorrhages, oedema, and ischaemia in the affected quadrant",
+        ],
+    },
+    "crvo": {
+        "concepts": ["central retinal vein occlusion", "total retinal venous obstruction"],
+        "descriptions": [
+            "occlusion of the central retinal vein leading to widespread haemorrhage and oedema across all four quadrants",
+        ],
+    },
+    "crao": {
+        "concepts": ["central retinal artery occlusion", "acute retinal ischaemia"],
+        "descriptions": [
+            "acute occlusion of the central retinal artery causing sudden profound visual loss with diffuse retinal whitening",
+        ],
+    },
+    "cl": {
+        "concepts": ["central artery ischaemia", "retinal arterial insufficiency"],
+        "descriptions": [
+            "ischaemic changes in the central retina related to arterial insufficiency, presenting with pallor and reduced perfusion",
+        ],
+    },
+    "ah": {
+        "concepts": ["arteriolar narrowing", "hypertensive arteriolar change"],
+        "descriptions": [
+            "narrowing of retinal arterioles, a hallmark of chronic hypertensive retinopathy indicating increased arterial wall resistance",
+        ],
+    },
+    "hr": {
+        "concepts": ["retinal haemorrhage", "intraretinal bleeding"],
+        "descriptions": [
+            "bleeding within the retinal layers, arising from vascular diseases such as diabetic or hypertensive retinopathy",
+        ],
+    },
+    "rhl": {
+        "concepts": ["layered retinal haemorrhage", "subhyaloid haemorrhage"],
+        "descriptions": [
+            "layered haemorrhage within or just beneath the retina, often associated with proliferative retinopathy or trauma",
+        ],
+    },
+    "prh": {
+        "concepts": ["preretinal haemorrhage", "subhyaloid bleed"],
+        "descriptions": [
+            "haemorrhage between the inner retinal surface and the posterior vitreous face, commonly boat-shaped in appearance",
+        ],
+    },
+    "cws": {
+        "concepts": ["cotton wool spots", "retinal nerve fibre infarcts"],
+        "descriptions": [
+            "whitish focal lesions in the nerve fibre layer representing microinfarcts, associated with hypertensive retinopathy or diabetic changes",
+        ],
+    },
+    "dn": {
+        "concepts": ["drusen", "RPE-Bruch membrane deposits"],
+        "descriptions": [
+            "extracellular deposits beneath the retinal pigment epithelium in Bruch's membrane, an early feature of age-related macular degeneration",
+        ],
+    },
+    # --- Structural / peripheral ---
+    "rd": {
+        "concepts": ["retinal detachment", "retinal separation"],
+        "descriptions": [
+            "separation of the neurosensory retina from the underlying retinal pigment epithelium, requiring urgent treatment to preserve vision",
+        ],
+    },
+    "grt": {
+        "concepts": ["giant retinal tear", "circumferential retinal break"],
+        "descriptions": [
+            "a circumferential full-thickness retinal tear spanning at least 90 degrees, often leading to retinal detachment",
+        ],
+    },
+    "rt": {
+        "concepts": ["retinal tear", "retinal break"],
+        "descriptions": [
+            "a full-thickness break in the retina, often caused by vitreoretinal traction, which may lead to retinal detachment if untreated",
+        ],
+    },
+    "rtr": {
+        "concepts": ["recurrent retinal tear", "repeat retinal break"],
+        "descriptions": [
+            "recurrence of a retinal tear after prior treatment, indicating ongoing vitreoretinal traction or incomplete adhesion",
+        ],
+    },
+    "rp": {
+        "concepts": ["retinitis pigmentosa", "inherited retinal degeneration"],
+        "descriptions": [
+            "a hereditary progressive retinal dystrophy causing peripheral photoreceptor degeneration, night blindness, and constriction of the visual field",
+        ],
+    },
+    "cb": {
+        "concepts": ["Coats disease", "retinal telangiectasia"],
+        "descriptions": [
+            "abnormal dilated and tortuous retinal vessels with subretinal exudate deposition, predominantly affecting young males",
+        ],
+    },
+    "st": {
+        "concepts": ["posterior staphyloma", "scleral ectasia"],
+        "descriptions": [
+            "outward bulging of the posterior sclera and uvea, common in pathological myopia, leading to progressive retinal thinning",
+        ],
+    },
+    "mya": {
+        "concepts": ["myopic degeneration", "pathological myopia changes"],
+        "descriptions": [
+            "degenerative changes associated with high myopia including posterior staphyloma, lacquer cracks, and chorioretinal atrophy",
+        ],
+    },
+    "tsln": {
+        "concepts": ["tessellated fundus", "tigroid fundus"],
+        "descriptions": [
+            "visibility of the underlying choroidal vessels through a thin RPE, giving a mosaic appearance typically seen in myopic eyes",
+        ],
+    },
+    "cf": {
+        "concepts": ["chorioretinal folds", "subretinal folds"],
+        "descriptions": [
+            "folds of the choroid and retina resulting from hypotony, orbital mass effect, or raised intracranial pressure",
+        ],
+    },
+    "vs": {
+        "concepts": ["vitreous syneresis", "vitreous liquefaction"],
+        "descriptions": [
+            "age-related breakdown of the vitreous gel structure causing liquid pockets, commonly associated with posterior vitreous detachment and floaters",
+        ],
+    },
+    "ls": {
+        "concepts": ["laser scars", "photocoagulation marks"],
+        "descriptions": [
+            "chorioretinal scars from prior laser photocoagulation treatment for conditions such as diabetic retinopathy or retinal tears",
+        ],
+    },
+    # --- Normal ---
+    "wnl": {
+        "concepts": ["normal retinal findings", "healthy fundus"],
+        "descriptions": [
+            "no significant retinal pathology detected; the fundus appearance is within normal limits",
+        ],
+    },
+}
+
+def _get_disease_specific_profile(predicted_label: str, disease_code: Optional[str] = None) -> Optional[Dict[str, List[str]]]:
+    """Return disease-specific semantic profile by code or name, or None if not found."""
+    if disease_code:
+        profile = _DISEASE_SEMANTIC_KB.get(disease_code.lower())
+        if profile:
+            return profile
+    # Try matching by disease name (lowercase, partial)
+    label_lower = predicted_label.lower()
+    for key, profile in _DISEASE_SEMANTIC_KB.items():
+        if key in label_lower or label_lower in key:
+            return profile
+    return None
 
 
 _DISEASE_ANATOMY_PROFILE: Dict[str, List[str]] = {
@@ -557,7 +923,8 @@ def explain(
         else:
             semantic_profile = _infer_semantic_profile(disease_embedding)
     except Exception:
-        semantic_profile = _fallback_semantic_profile()
+        specific = _get_disease_specific_profile(predicted_label, disease_code)
+        semantic_profile = specific if specific is not None else _fallback_semantic_profile()
 
     try:
         entities = _extract_entities(clinical_text, top_k) if clinical_text else []
